@@ -68,7 +68,7 @@ Dann auf GitHub unter *Settings → Secrets and variables → Actions → New re
 | Erinnerung | Kalender-Termin (.ics) | echte Mitteilungen, hören für heute auf, sobald etwas eingetragen ist |
 | Sicherung exportieren | Download | Teilen-Menü („In Dateien speichern“, USB, Quick Share) |
 | PDF-Bericht | Druckdialog | Bericht als Datei teilen, im Browser öffnen und drucken |
-| App-Übersicht | zeigt Inhalt | Inhalt verborgen, keine Bildschirmfotos |
+| App-Übersicht | zeigt Inhalt | Inhalt verborgen, keine Bildschirmfotos (abschaltbar: Einstellungen → Inhalt schützen) |
 | Offline | Service Worker | immer offline |
 
 ## Noch offen / später

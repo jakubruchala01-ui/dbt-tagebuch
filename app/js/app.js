@@ -34,7 +34,7 @@ const E = () => state.config.einstellungen;
 const saveConfig = () => db.putConfig(state.config);
 const ketten = kettenModul({ $main, state });
 
-const EINSTELLUNGEN_STANDARD = { wochenstart: 1, pin: null, hinweisGesehen: false, notfallPlan: '', tonfall: 'klar', notfallKontakte: [] };
+const EINSTELLUNGEN_STANDARD = { wochenstart: 1, pin: null, hinweisGesehen: false, notfallPlan: '', tonfall: 'klar', notfallKontakte: [], inhaltSchuetzen: true };
 const BEFINDEN_IDS = ['f_belastung', 'f_selbstmitgefuehl', 'f_suizid', 'f_schlaf_erholsam', 'f_dissoziation', 'f_vertrauen'];
 
 // ---------- Tonfall ----------
@@ -842,7 +842,7 @@ function renderDatenschutz() {
       Bewahre sie sicher auf und schicke sie möglichst nicht über Messenger, E-Mail oder Cloud. Was du mit der Datei machst, entscheidest du.</p>
 
       <h3>Schutz vor neugierigen Blicken</h3>
-      <p>Die PIN-Sperre schützt die Anzeige, verschlüsselt die Daten aber nicht. ${istNativ() ? 'In der App-Übersicht wird der Inhalt verborgen.' : 'Schütze dein Gerät zusätzlich mit einer Bildschirmsperre.'}</p>
+      <p>Die PIN-Sperre schützt die Anzeige, verschlüsselt die Daten aber nicht. ${istNativ() ? 'Mit „Inhalt schützen“ (Einstellungen) ist der Inhalt in der App-Übersicht verborgen und Bildschirmfotos sind gesperrt.' : 'Schütze dein Gerät zusätzlich mit einer Bildschirmsperre.'}</p>
 
       <h3>Alles löschen</h3>
       <p>${loeschen} Vorher exportieren, wenn du die Daten behalten möchtest – sie sind sonst endgültig weg.</p>
@@ -1274,6 +1274,12 @@ async function renderDaten() {
       <div class="segment wrap" id="wochenstart">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<button type="button" data-act="wochenstart" data-wert="${d}" class="${E().wochenstart === d ? 'on' : ''}">${WOCHENTAGE[d]}</button>`).join('')}</div>
       <p class="meta">Wochen laufen jetzt von ${WOCHENTAGE[E().wochenstart]} bis ${WOCHENTAGE[(E().wochenstart + 6) % 7]}.</p>
     </div>
+    ${istNativ() ? `<div class="karte">
+      <h2>Inhalt schützen</h2>
+      <p class="meta">An: In der App-Übersicht ist der Inhalt verborgen, Bildschirmfotos sind gesperrt. Android koppelt beides – wer Bildschirmfotos machen möchte,
+      schaltet kurz aus und danach wieder ein.</p>
+      <label class="check"><input type="checkbox" id="inhalt-schuetzen" ${E().inhaltSchuetzen !== false ? 'checked' : ''}> Inhalt schützen</label>
+    </div>` : ''}
     <div class="karte">
       <h2>PIN-Sperre</h2>
       <p class="meta">Fragt beim Öffnen und nach 1 Minute im Hintergrund nach einer PIN (4–8 Ziffern).
@@ -1679,6 +1685,12 @@ $main.addEventListener('change', async (e) => {
     if (r?.grund === 'erlaubnis') { e.an = false; await saveConfig(); $main.querySelector('#erinnerung-karte').innerHTML = erinnerungHtml(); return toast('Mitteilungen sind nicht erlaubt – bitte in den Handy-Einstellungen erlauben'); }
     return toast(erinnerungMoeglich() ? (e.an ? 'Erinnerung gespeichert' : 'Erinnerung aus') : 'Gespeichert');
   }
+  if (t.id === 'inhalt-schuetzen') {
+    E().inhaltSchuetzen = t.checked;
+    await saveConfig();
+    await bildschirmSchutz(t.checked);
+    return toast(t.checked ? 'Inhalt geschützt – keine Bildschirmfotos' : 'Schutz aus – Bildschirmfotos möglich');
+  }
   if (t.id === 'sanfter-hinweis') {
     E().sanfterHinweis = t.checked;
     await saveConfig();
@@ -1838,7 +1850,7 @@ async function init() {
   if (!E().hinweisGesehen) await zeigeHinweis();
   if (istNativ()) {
     // Handy-App: Inhalt in der App-Übersicht verbergen, Erinnerungen aktuell halten
-    bildschirmSchutz(true);
+    bildschirmSchutz(E().inhaltSchuetzen !== false);
     beiMitteilungAntippen(() => { state.date = todayISO(); show('heute'); });
     beiRueckkehr(() => erinnerungenAktualisieren());
     erinnerungenAktualisieren();

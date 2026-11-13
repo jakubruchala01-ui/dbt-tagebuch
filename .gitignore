@@ -1,0 +1,9 @@
+node_modules/
+android/
+ios/
+*.keystore
+*.jks
+*.apk
+*.aab
+# Eigene Sicherungen nie ins Repository
+dbt-tagebuch-*.json

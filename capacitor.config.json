@@ -1,0 +1,18 @@
+{
+  "appId": "de.dbttagebuch.app",
+  "appName": "DBT-Tagebuch",
+  "webDir": "app",
+  "backgroundColor": "#4F7A6A",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#4F7A6A"
+    },
+    "PrivacyScreen": {
+      "enable": true
+    }
+  }
+}

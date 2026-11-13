@@ -1,0 +1,180 @@
+/* PDF-Bericht: feste helle Farben, unabhängig vom Dunkelmodus.
+   Alle Regeln gelten nur innerhalb von #druck, damit sie die App (z. B. den Verlauf) nicht beeinflussen. */
+
+@page {
+  size: A4 landscape;
+  margin: 11mm 12mm 12mm;
+  @bottom-right {
+    content: "Seite " counter(page) " von " counter(pages);
+    font: 7.5pt "Segoe UI", system-ui, sans-serif;
+    color: #8a929c;
+  }
+}
+
+#druck {
+  --ink: #1f2933;
+  --mute: #66717d;
+  --line: #d9dee3;
+  --soft: #f3f5f6;
+  --brand: #3f6b5f;
+  --brand-soft: #e6efeb;
+  --tint: 63, 107, 95;   /* RGB für Skalen-Schattierung */
+  --ja: #b4532a;
+
+  position: fixed; inset: 0; z-index: 50;
+  overflow: auto;
+  background: #5d6670;
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+body.druckmodus { overflow: hidden; }
+
+.druckleiste {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap;
+  padding: 10px 16px; background: #2b3138; color: #e8ecef;
+}
+.druckleiste span { margin-right: auto; font-size: .9rem; opacity: .85; }
+.druckleiste button { background: #3a424b; color: #fff; border-color: #4b545e; }
+.druckleiste button.primary { background: #6c9c8e; border-color: #6c9c8e; color: #10201b; }
+
+.blaetter { padding: 24px 16px 48px; }
+
+#druck .blatt {
+  width: 297mm; max-width: 100%;
+  min-height: 210mm;
+  margin: 0 auto 24px;
+  padding: 11mm 12mm 10mm;
+  background: #fff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .35);
+  display: flex; flex-direction: column;
+  font-size: 8.5pt; line-height: 1.22;
+}
+
+/* Kopf */
+#druck .kopf {
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
+  padding-bottom: 3mm; margin-bottom: 4mm;
+  border-bottom: 2px solid var(--brand);
+}
+#druck .marke { font-size: 18pt; font-weight: 700; letter-spacing: .02em; color: var(--brand); line-height: 1.1; }
+#druck .zeitraum { font-size: 10pt; color: var(--ink); margin-top: 1mm; }
+#druck .kopfmeta { display: flex; gap: 7mm; margin: 0; }
+#druck .kopfmeta div { min-width: 22mm; }
+#druck .kopfmeta dt { font-size: 6.5pt; text-transform: uppercase; letter-spacing: .08em; color: var(--mute); }
+#druck .kopfmeta dd { margin: .5mm 0 0; font-size: 9.5pt; font-weight: 600; border-bottom: 1px solid var(--line); padding-bottom: .5mm; min-width: 30mm; }
+
+/* Tabelle */
+#druck .karte-tabelle { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+#druck .karte-tabelle col.c-label { width: 62mm; }
+#druck .karte-tabelle col.c-summe { width: 23mm; }
+#druck .karte-tabelle th, #druck .karte-tabelle td {
+  border-bottom: 1px solid var(--line);
+  padding: .75mm 1.5mm;
+  vertical-align: middle;
+}
+#druck .karte-tabelle td { text-align: center; border-left: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+#druck .karte-tabelle tr { break-inside: avoid; }
+#druck .karte-tabelle thead th {
+  background: var(--brand); color: #fff; font-weight: 600; border-bottom: 0;
+}
+#druck .karte-tabelle thead th.ecke { border-radius: 2mm 0 0 0; }
+#druck .karte-tabelle thead th.summe { border-radius: 0 2mm 0 0; background: #345a50; }
+#druck .karte-tabelle thead th.tag { text-align: center; border-left: 1px solid rgba(255, 255, 255, .18); }
+#druck .karte-tabelle thead th.tag b { display: block; font-size: 9pt; }
+#druck .karte-tabelle thead th.tag span { font-size: 7pt; opacity: .85; font-weight: 400; }
+#druck .karte-tabelle thead th.tag.ohne { background: #7d958e; }
+
+#druck .karte-tabelle tr.gruppe th {
+  background: var(--brand-soft); color: var(--brand);
+  text-align: left; font-size: 7.5pt; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding-top: 1.4mm; padding-bottom: 1.2mm;
+}
+#druck .karte-tabelle tr.gruppe th small { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--mute); margin-left: 2mm; }
+
+#druck th.label { text-align: left; font-weight: 600; }
+#druck th.label span { display: block; }
+#druck th.label small { display: block; font-weight: 400; color: var(--mute); font-size: 6.8pt; margin-top: .3mm; }
+
+#druck td.leer { background: #fff; }
+#druck td.skala { background: rgba(var(--tint), var(--i)); font-weight: 600; }
+#druck td.ja { color: var(--ja); font-weight: 700; }
+#druck td.nein { color: var(--mute); }
+#druck td.zahl small, #druck td.summe small { color: var(--mute); }
+#druck td.meds { text-align: left; font-size: 7pt; line-height: 1.25; }
+#druck td.meds div + div { margin-top: .4mm; }
+#druck td.meds small { color: var(--mute); white-space: nowrap; }
+#druck td.skillzelle { color: var(--brand); font-weight: 700; }
+#druck td.skillzelle small { color: var(--ink); font-weight: 400; }
+#druck td.summe, #druck th.summe { background: var(--soft); font-weight: 600; }
+#druck td.hinweis { text-align: left; color: var(--mute); font-style: italic; }
+
+/* Notizen */
+#druck .notizen { margin-top: 5mm; }
+#druck .notizen h3 {
+  font-size: 9pt; text-transform: uppercase; letter-spacing: .08em; color: var(--brand);
+  margin: 0 0 2mm; padding-bottom: 1mm; border-bottom: 1px solid var(--line);
+}
+#druck .notizspalten { column-count: 3; column-gap: 7mm; }
+#druck .notiztag { break-inside: avoid; margin-bottom: 2.5mm; font-size: 8pt; }
+#druck .notiztag h4 { margin: 0 0 .8mm; font-size: 8.5pt; color: var(--ink); }
+#druck .notiztag dl { margin: 0; }
+#druck .notiztag dt { font-size: 6.8pt; color: var(--mute); text-transform: uppercase; letter-spacing: .05em; margin-top: .8mm; }
+#druck .notiztag dd { margin: .2mm 0 0; white-space: normal; }
+
+#druck .fuss {
+  margin-top: auto; padding-top: 4mm;
+  font-size: 6.8pt; color: var(--mute);
+  border-top: 1px solid var(--line);
+}
+
+/* Vorwochen-Spalte */
+#druck .karte-tabelle.mit-vergleich col.c-label { width: 52mm; }
+#druck .karte-tabelle.mit-vergleich col.c-summe { width: 21mm; }
+#druck td.summe.vor { background: #fafbfb; color: var(--mute); font-weight: 500; }
+#druck .karte-tabelle thead th.summe.vor { background: #557a6f; color: #eef4f1; }
+#druck .karte-tabelle.mit-vergleich thead th.summe:not(.vor) { border-radius: 0; }
+#druck .karte-tabelle thead th.summe.vor { border-radius: 0 2mm 0 0; }
+#druck tr.zusammen th, #druck tr.zusammen td { border-top: 1.5px solid #c5ccd3; font-weight: 600; }
+
+/* Verhaltensketten-Blatt */
+#druck .kette { break-inside: avoid; border: 1px solid var(--line); border-radius: 2mm; padding: 4mm 5mm; margin-bottom: 5mm; }
+#druck .kette h3 { margin: 0 0 3mm; font-size: 11pt; color: var(--brand); }
+#druck .kette h3 small { font-size: 8pt; color: var(--mute); font-weight: 400; margin-left: 2mm; }
+#druck .kette-raster { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm 6mm; }
+#druck .k-feld h4, #druck .k-unter { margin: 0 0 .8mm; font-size: 6.8pt; text-transform: uppercase; letter-spacing: .06em; color: var(--mute); }
+#druck .k-feld p { margin: 0; }
+#druck .k-unter { margin-top: 3mm; }
+#druck ol.k-glieder { margin: 1mm 0 3mm; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 2mm; counter-reset: kg; }
+#druck ol.k-glieder li {
+  counter-increment: kg; position: relative; flex: 1 1 45mm; max-width: 80mm;
+  border: 1px solid var(--line); border-left: 3px solid var(--brand); border-radius: 1.5mm;
+  padding: 1.5mm 2mm 1.5mm 6mm; background: var(--soft);
+}
+#druck ol.k-glieder li::before { content: counter(kg); position: absolute; left: 1.6mm; top: 1.5mm; font-weight: 700; color: var(--brand); font-size: 7.5pt; }
+#druck .k-art { display: block; font-size: 6.5pt; text-transform: uppercase; letter-spacing: .05em; color: var(--brand); font-weight: 700; }
+
+/* Für die nächste Stunde */
+#druck .stunde-h { font-size: 10pt; color: var(--brand); margin: 4mm 0 2mm; }
+#druck .stunde-liste { margin: 0; padding-left: 6mm; font-size: 10pt; line-height: 1.45; }
+#druck .stunde-liste li { margin-bottom: 2.5mm; padding-bottom: 2mm; border-bottom: 1px dotted var(--line); }
+#druck .stunde-liste small { color: var(--mute); font-size: 7.5pt; }
+
+/* Druck */
+@media print {
+  body.druckmodus > *:not(#druck) { display: none !important; }
+  body.druckmodus { background: #fff; overflow: visible; }
+  #druck { position: static; overflow: visible; background: none; }
+  .druckleiste { display: none !important; }
+  .blaetter { padding: 0; }
+  #druck .blatt {
+    width: auto; min-height: 0; max-width: none;
+    margin: 0; padding: 0; box-shadow: none;
+    break-after: page;
+  }
+  #druck .blatt:last-child { break-after: auto; }
+  #druck .fuss { margin-top: 4mm; }
+}
+#druck .luecken { margin: 2mm 0 0; font-size: 8pt; color: var(--ink); }

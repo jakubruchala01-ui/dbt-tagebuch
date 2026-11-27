@@ -304,7 +304,7 @@ function lueckenHtml(fehlend, heuteErledigt) {
   const text = {
     sanft: 'Schön, dass du da bist. Lücken sind okay – du kannst einfach mit heute weitermachen. Nachtragen ist freiwillig.',
     klar: `${wann} – kann passieren. Magst du kurz nachtragen oder in einem Satz notieren, was los war?`,
-    direkt: `${wann}. Trag sie jetzt kurz nach oder notiere den Grund – die Lücke gehört mit in die nächste Stunde.`,
+    direkt: `${wann}. Trag sie kurz nach oder notiere den Grund. Auch eine Lücke ist eine nützliche Information für die Therapie.`,
   }[t];
   return `<div class="luecken-box ton-${t}">
     <p>${text}</p>

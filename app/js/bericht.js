@@ -70,7 +70,15 @@ function feldLabel(f) {
 function lueckenZeile(woche, eintraege, luecken = {}) {
   const l = woche.map((d, k) => (!eintraege[k] && luecken[d] ? { d, ...luecken[d] } : null)).filter(Boolean);
   if (!l.length) return '';
-  return `<div class="luecken"><b>Ohne Karte:</b> ${l.map((x) => `${teile(x.d).wt} ${datum(x.d)} – ${esc([x.grund, x.text].filter(Boolean).join(': '))}`).join(' · ')}</div>`;
+  // Tage mit derselben Notiz zusammenfassen (z. B. „Mo 3.–Do 6.: krank“) statt denselben Satz mehrfach
+  const gruppen = [];
+  for (const x of l) {
+    const text = [x.grund, x.text].filter(Boolean).join(': ');
+    const g = gruppen.at(-1);
+    if (g && g.text === text) g.tage.push(x.d); else gruppen.push({ text, tage: [x.d] });
+  }
+  const tagName = (d) => `${teile(d).wt} ${datum(d)}`;
+  return `<div class="luecken"><b>Ohne Karte:</b> ${gruppen.map((g) => `${g.tage.length > 1 ? `${tagName(g.tage[0])} bis ${tagName(g.tage.at(-1))}` : tagName(g.tage[0])} – ${esc(g.text)}`).join(' · ')}</div>`;
 }
 
 export function berichtHTML(o) {

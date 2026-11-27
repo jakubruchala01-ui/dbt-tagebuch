@@ -46,6 +46,7 @@ export function zeigeHinweis() {
       const letzter = i === schritte.length - 1;
       const box = openModal(`${schritte[i]()}
         <div class="tour-punkte" aria-hidden="true">${schritte.map((_, k) => `<span class="${k === i ? 'an' : ''}"></span>`).join('')}</div>
+        <span class="nur-vorlesen">Schritt ${i + 1} von ${schritte.length}</span>
         <div class="actions dialog-knoepfe">
           ${letzter ? '' : '<button class="ghost" id="tour-skip">Überspringen</button>'}
           ${i > 0 ? '<button class="ghost" id="tour-zurueck">Zurück</button>' : ''}

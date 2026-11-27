@@ -129,6 +129,7 @@ Offen daraus: Texte der Datenschutzseite ergänzen (Druckdienst, Teilen, Tastatu
   damit alte Einträge, Verlauf und PDF stimmen. Standard je Verhalten sinnvoll vorbelegen (Gaming: Stunden).
 
 **Optik „runder“ (Inspiration: Insight Timer, MoodMission, Anxiety Check-In)**
+- (erledigt 27.11.2026, v0.1.11) Pastell-Verläufe, Nunito lokal, große getönte Flächen, Tour als Vollbild mit großen Antworten, Schnell-Karte Schritt für Schritt, Schalter „Ruhige Darstellung“. Plan und Prüfer: `testberichte/11-Redesign-Plan.md`.
 - Erster Start: eine Frage „Wie ausführlich möchtest du deine Karte?“ mit großen Antworten (Einfach / Standard / Ausführlich / Vorlage meiner Therapeutin)
 - Schnell-Karte als Schritt-für-Schritt: eine Frage pro Bildschirm, Fortschrittsbalken
 - Formen: Karten stark gerundet (ca. 20 px), Knöpfe und Chips als Pillen, Wertewahl als runde Punkte, weiche Schatten statt Rahmen, mehr Abstand

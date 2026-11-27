@@ -66,41 +66,100 @@ export async function zeigeSchnellkarte(datum = todayISO()) {
   const stored = await db.getEntry(heute);
   const werte = { ...(stored?.values ?? {}) };
   const felder = (state.config.schnellFelder ?? []).map((id) => state.config.fields.find((f) => f.id === id)).filter((f) => f && !f.hidden);
+  const gewaehlt = (f, v) => werte[f.id] === v;
   const chips = (f) => {
-    if (f.type === 'yesno') return [true, false].map((b) => `<button type="button" data-sf="${f.id}" data-sv="${b}" class="${werte[f.id] === b ? 'on' : ''}">${b ? 'Ja' : 'Nein'}</button>`).join('');
+    const knopf = (v, text) => `<button type="button" data-sf="${f.id}" data-sv="${v}" class="${gewaehlt(f, v) ? 'on' : ''}" aria-pressed="${gewaehlt(f, v)}">${text}</button>`;
+    if (f.type === 'yesno') return [true, false].map((b) => knopf(b, b ? 'Ja' : 'Nein')).join('');
     const opts = [];
     for (let x = f.min; x <= f.max + 1e-9; x = +(x + f.step).toFixed(4)) opts.push(x);
-    return opts.map((o) => `<button type="button" data-sf="${f.id}" data-sv="${o}" class="${werte[f.id] === o ? 'on' : ''}">${o}</button>`).join('');
+    return opts.map((o) => knopf(o, o)).join('');
   };
-  const box = openModal(`
-    <h2>${icon('blitz', 20)} Schnell-Karte <small class="meta">· ${nachtrag ? `für ${esc(WOCHENTAGE[wochentag(datum)])}, ${datumKurz(datum)}` : 'ca. 30 Sekunden'}</small></h2>
-    <p class="meta">${nachtrag ? 'Nachtragen, so gut du dich erinnerst. Ungefähr reicht.' : 'Nur das Nötigste für heute. Skills und den Rest kannst du später in der Karte ergänzen.'}</p>
-    ${felder.map((f) => `<div class="schnellfeld"><span class="fname">${esc(feldTitel(f))}</span>${f.hint ? `<span class="hint">${esc(f.hint)}</span>` : ''}
-      <div class="chips schnell-chips">${chips(f)}</div></div>`).join('') || '<p>Noch keine Felder gewählt. Unter Mehr → Vorlage kannst du Felder für die Schnell-Karte markieren.</p>'}
-    <div class="actions dialog-knoepfe">
-      <button class="ghost" data-modal-zu>Abbrechen</button>
-      <button class="primary" id="schnell-speichern">${icon('check', 18)} Speichern</button>
-    </div>`, { klasse: 'schnell' });
+  const kopf = `<h2>${icon('blitz', 20)} Schnell-Karte <small class="meta">· ${nachtrag ? `für ${esc(WOCHENTAGE[wochentag(datum)])}, ${datumKurz(datum)}` : 'ca. 30 Sekunden'}</small></h2>
+    <p class="meta">${nachtrag ? 'Nachtragen, so gut du dich erinnerst. Ungefähr reicht.' : 'Nur das Nötigste für heute. Skills und den Rest kannst du später in der Karte ergänzen.'}</p>`;
+  if (!felder.length) {
+    openModal(`${kopf}<p>Noch keine Felder gewählt. Unter Mehr → Vorlage kannst du Felder für die Schnell-Karte markieren.</p>
+      <div class="actions dialog-knoepfe"><button class="ghost" data-modal-zu>Abbrechen</button></div>`, { klasse: 'schnell' });
+    return;
+  }
+
+  // Eine Frage pro Bildschirm; der letzte Schritt zeigt eine kurze Übersicht. Speichern geht jederzeit.
+  const n = felder.length;
+  let i = 0;
+  const box = openModal(`${kopf}
+    <div class="sk-balken" role="progressbar" aria-label="Fortschritt" aria-valuemin="1" aria-valuemax="${n + 1}"><span></span></div>
+    <p class="sk-zaehler meta" aria-live="polite"></p>
+    <div class="sk-schritt"></div>
+    <div class="actions dialog-knoepfe sk-knoepfe">
+      <button class="ghost" id="sk-zurueck">${icon('links', 18)} Zurück</button>
+      <button class="ghost" id="schnell-speichern">${icon('check', 18)} Speichern</button>
+      <button class="primary" id="sk-weiter"></button>
+    </div>`, { klasse: 'schnell sk' });
+  const anzeige = (f) => (hasValue(werte[f.id]) ? (werte[f.id] === true ? 'Ja' : werte[f.id] === false ? 'Nein' : werte[f.id]) : '–');
+  const zeigen = () => {
+    const ende = i === n;
+    const f = felder[i];
+    box.querySelector('.sk-schritt').innerHTML = ende
+      ? `<h3 class="sk-frage" tabindex="-1">Fertig – so sieht deine Schnell-Karte aus</h3>
+        <ul class="sk-uebersicht">${felder.map((g, k) => `<li><button type="button" class="ghost" data-sk-gehe="${k}"><span>${esc(feldTitel(g))}</span><b>${esc(String(anzeige(g)))}</b></button></li>`).join('')}</ul>`
+      : `<h3 class="sk-frage" tabindex="-1">${esc(feldTitel(f))}</h3>${f.hint ? `<p class="hint">${esc(f.hint)}</p>` : ''}
+        <div class="chips schnell-chips">${chips(f)}</div>`;
+    box.querySelector('.sk-balken').setAttribute('aria-valuenow', i + 1);
+    box.querySelector('.sk-balken span').style.width = `${((i + 1) / (n + 1)) * 100}%`;
+    box.querySelector('.sk-zaehler').textContent = ende ? 'Übersicht' : `Frage ${i + 1} von ${n}`;
+    box.querySelector('#sk-zurueck').disabled = i === 0;
+    const weiter = box.querySelector('#sk-weiter');
+    weiter.hidden = ende;
+    if (!ende) weiter.innerHTML = `${hasValue(werte[f.id]) ? 'Weiter' : 'Überspringen'} ${icon('rechts', 18)}`;
+    box.querySelector('#schnell-speichern').className = ende ? 'primary' : 'ghost';
+    box.querySelector('.sk-frage').focus({ preventScroll: true });
+  };
+  const gehe = (k) => { i = Math.max(0, Math.min(n, k)); zeigen(); };
   box.addEventListener('click', (e) => {
+    const g = e.target.closest('[data-sk-gehe]');
+    if (g) return gehe(+g.dataset.skGehe);
     const b = e.target.closest('[data-sf]');
     if (!b) return;
     const raw = b.dataset.sv;
     const v = raw === 'true' ? true : raw === 'false' ? false : Number(raw);
     werte[b.dataset.sf] = werte[b.dataset.sf] === v ? null : v;
-    box.querySelectorAll(`[data-sf="${b.dataset.sf}"]`).forEach((x) => x.classList.toggle('on', x === b && werte[b.dataset.sf] !== null));
+    box.querySelectorAll(`[data-sf="${b.dataset.sf}"]`).forEach((x) => {
+      const an = x === b && werte[b.dataset.sf] !== null;
+      x.classList.toggle('on', an);
+      x.setAttribute('aria-pressed', an);
+    });
+    box.querySelector('#sk-weiter').innerHTML = `${hasValue(werte[b.dataset.sf]) ? 'Weiter' : 'Überspringen'} ${icon('rechts', 18)}`;
   });
-  box.querySelector('#schnell-speichern').onclick = async () => {
-    const now = new Date().toISOString();
-    const e = cleanEntry({ date: heute, skills: {}, status: 'entwurf', ...stored, values: werte });
-    if (!Object.keys(e.values).length) { closeModal(); return; }
-    e.templateVersion = currentVersion(state.config).v;
-    e.createdAt ??= now;
-    e.updatedAt = now;
-    await db.putEntry(e);
-    closeModal();
-    if (nachtrag) { toast(`Nachgetragen für ${datumKurz(datum)}`); erinnerungenAktualisieren(); } else rueckmeldung(e.values);
-    if (['woche', 'heute'].includes(state.view)) await nav.neuZeichnen();
-  };
+  box.querySelector('#sk-zurueck').onclick = () => gehe(i - 1);
+  box.querySelector('#sk-weiter').onclick = () => gehe(i + 1);
+  // Wischen (nur Zusatz zu den Knöpfen): deutlich waagerecht, mindestens 60 px
+  const flaeche = box.querySelector('.sk-schritt');
+  let start = null;
+  flaeche.addEventListener('pointerdown', (e) => { start = e.pointerType === 'touch' ? { x: e.clientX, y: e.clientY } : null; });
+  flaeche.addEventListener('pointerup', (e) => {
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    start = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) gehe(i + (dx < 0 ? 1 : -1));
+  });
+  flaeche.addEventListener('pointercancel', () => { start = null; });
+  box.querySelector('#schnell-speichern').onclick = () => speichereSchnell(heute, stored, werte, nachtrag);
+  zeigen();
+  setTimeout(() => box.querySelector('.sk-frage')?.focus({ preventScroll: true }), 40); // nach dem Standard-Fokus des Fensters
+}
+
+/** Schnell-Karte speichern (unverändert gegenüber der Ein-Bildschirm-Fassung) */
+async function speichereSchnell(heute, stored, werte, nachtrag) {
+  const now = new Date().toISOString();
+  const e = cleanEntry({ date: heute, skills: {}, status: 'entwurf', ...stored, values: werte });
+  if (!Object.keys(e.values).length) { closeModal(); return; }
+  e.templateVersion = currentVersion(state.config).v;
+  e.createdAt ??= now;
+  e.updatedAt = now;
+  await db.putEntry(e);
+  closeModal();
+  if (nachtrag) { toast(`Nachgetragen für ${datumKurz(heute)}`); erinnerungenAktualisieren(); } else rueckmeldung(e.values);
+  if (['woche', 'heute'].includes(state.view)) await nav.neuZeichnen();
 }
 
 /** Übung als genutzten Skill in die heutige Karte eintragen */

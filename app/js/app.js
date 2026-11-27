@@ -14,7 +14,7 @@ import { pinHash, pinPruefen, pinGueltig, sperren } from './sicherheit.js';
 import { HELL, NACHT, MODI, DESIGN_STANDARD, wendeDesignAn } from './design.js';
 import { starteUebung, uebungenListe, UEBUNGEN } from './uebungen.js';
 import {
-  istNativ, dateiSpeichern, kannDrucken, ERINNERUNG_STANDARD, ABSTAENDE, erinnerungsZeiten, erinnerungMoeglich,
+  istNativ, dateiSpeichern, kannDrucken, drucken, ERINNERUNG_STANDARD, ABSTAENDE, erinnerungsZeiten, erinnerungMoeglich,
   erinnerungenPlanen, beiMitteilungAntippen, beiRueckkehr, kalenderDatei, bildschirmSchutz,
 } from './plattform.js';
 
@@ -1156,8 +1156,7 @@ document.getElementById('druck').addEventListener('click', (e) => {
   if (act === 'pdf-drucken') {
     const alt = document.title;
     document.title = `Diary-Card ${state.pdf.von} bis ${state.pdf.bis}`; // Vorschlag für den Dateinamen
-    window.print();
-    document.title = alt;
+    drucken(document.title).finally(() => { document.title = alt; });
   }
 });
 

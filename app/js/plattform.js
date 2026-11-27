@@ -26,8 +26,12 @@ export async function dateiSpeichern(name, text, mime = 'application/json') {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Drucken bzw. als PDF speichern. In der App gibt es (noch) keinen Druckdialog. */
-export const kannDrucken = () => !istNativ();
+/** Drucken bzw. als PDF speichern: im Browser window.print(), in der Android-App eigener Baustein „Drucken“. */
+export const kannDrucken = () => !istNativ() || !!cap()?.isPluginAvailable?.('Drucken');
+export async function drucken(name) {
+  if (istNativ()) return plugin('Drucken').drucken({ name });
+  window.print();
+}
 
 // ---------- Erinnerungen ----------
 export const ERINNERUNG_STANDARD = { an: false, start: '12:00', abstand: 60, ende: '21:00', tonfall: null };

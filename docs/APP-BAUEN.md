@@ -73,6 +73,63 @@ Dann auf GitHub unter *Settings → Secrets and variables → Actions → New re
 
 ## Noch offen / später
 
+**ALLERERSTES (Fehler, 27.11.2026): PDF in der Handy-App liefert nur eine HTML-Datei – nutzlos**
+- Ursache: In der APK gibt es keinen Druckdialog, `berichtAlsDatei()` teilt deshalb HTML.
+- Lösung A (bevorzugt): Android-Druckdialog über ein Druck-Plugin → „Als PDF speichern“, gleiches Layout wie im Browser.
+  Plugin vorher prüfen (gepflegt, keine Netzwerkzugriffe, Capacitor 7).
+- Lösung B: echte PDF-Datei in der App erzeugen (z. B. jsPDF, lokal mitgeliefert, kein Internet), dann teilen.
+- Test: APK auf dem Handy → PDF erzeugen → in Dateien öffnen, Seiten und Umlaute prüfen.
+- Übergang: PDF über die Web-Version im Browser (Drucken → Als PDF speichern).
+
+**Nächstes Paket (besprochen 27.11.2026): Einstieg leicht machen**
+- Tour beim ersten Start (4 Schritte, überspringbar, unter Mehr wiederholbar), ersetzt den alten Start-Hinweis
+- „?“ oben auf jeder Seite mit 3–5 Sätzen zu genau diesem Bildschirm
+- Fertige Vorlagen statt leerem Baukasten: Einfach / Standard / Ausführlich; Gruppen-Vorlage der Psychologin als Datei (nur Struktur, keine Daten)
+- „Vorlage“ unter Mehr nach unten: „Karte anpassen (für später)“
+- Text in der Tour: „Deine Einträge bleiben nur auf diesem Handy. Niemand sonst kann sie sehen – auch nicht die Entwickler, die Klinik oder eine andere Stelle. Es gibt keine Kopie im Internet. Geht das Handy verloren oder wird die App gelöscht, sind sie weg. Sichere sie deshalb regelmäßig: Mehr → Einstellungen & Daten → Sicherung.“
+- Beim PDF und bei der Sicherung: „Nicht per Messenger, Mail oder Cloud verschicken – in der Stunde zeigen oder ausdrucken.“
+
+**Dränge und Skills einfacher (Wunsch 27.11.2026)**
+- Karte fragt zuerst „Dränge heute? Ja / Nein“. Nein = fertig, nichts weiter.
+- Ja → Liste der eigenen gespeicherten Dränge (nur antippen, welche heute da waren) + darunter „+ Drang hinzufügen“.
+  Nur angetippte Dränge bekommen Stärke 0–5 und „Habe ich es getan?“.
+- Skalen beschriften. Drang: 0 kein · 1 kaum spürbar · 2 leicht · 3 deutlich · 4 stark · 5 kaum auszuhalten.
+  Skill-Wirkung: 0 nicht geholfen · 1 kaum · 2 etwas · 3 spürbar · 4 deutlich · 5 sehr geholfen.
+- Skills genauso: „Skills genutzt? Ja / Nein“ → eigene Skill-Liste antippen + „+ Skill hinzufügen“, Wirkung nur bei angetippten.
+- Dränge ändern sich langsam: Liste zeigt die Dränge der letzten Tage zuerst, Knopf „Wie gestern“ übernimmt die Auswahl (Stärke trotzdem neu wählen, nichts automatisch eintragen).
+- Skills als Kacheln/Chips zum Antippen (mehrere möglich), oft genutzte zuerst, Rest nach DBT-Modul aufklappbar
+  (Achtsamkeit, Stresstoleranz, Gefühle regulieren, Zwischenmenschlich). Angetippte bekommen darunter die Wirkung 0–5.
+- Alte Einträge und PDF müssen weiter funktionieren (Daten-Umbau prüfen).
+
+**Zuerst bei vollem Kontingent: Datenschutz-Prüfung (Agent, nur lesend, Sonnet)**
+- Android: automatische Google-Drive-Sicherung (`allowBackup`) – Verdacht: Tagebuch landet doch in der Cloud. Berechtigungen der APK, Mitteilungen ohne Inhalt
+- Web: CSP blockiert wirklich alles nach außen? Service-Worker-Cache
+- Export/PDF: Inhalt, verräterische Dateinamen · PIN: Texte ehrlich? · DATENSCHUTZ.md passt zum Code?
+- Danach: echte Psychologin Texte gegenlesen lassen (Krisenhinweis, TIPP-Warnung, Skalen)
+
+**Umbau-Pflicht: alte Daten übernehmen (Jakub nutzt die App bereits)**
+- Vor dem Umbau eigene Sicherung exportieren. Neue Version muss alte Sicherungen (heutiges Format) importieren und umwandeln
+  (Dränge/Skills/„Wie lange“ in neue Form, nichts verlieren). Sicherungsdatei bekommt Formatversion.
+- Test: echte Alt-Sicherung (Kopie) importieren → Verlauf und PDF vergleichen, vorher/nachher gleich.
+
+**Nach dem Umbau: Code-Prüfung auf Qualität („Slop“)**
+- app.js hat ~1.900 Zeilen in einer Datei → beim Umbau in Module teilen (Karte, Vorlage, Einstellungen, Notfall)
+- Danach Prüfung: doppelter Code, tote Funktionen, unklare Namen, fehlende Fehlerbehandlung (z. B. mit /simplify und /code-review)
+
+**Vorlage aufräumen (Analyse: testberichte/7-Vorlage-Analyse.md)**
+- Vorinstallierte Wege und Dränge sind alle aufgeklappt: man sieht nicht, was schon da ist → Doppelte, eigene Einträge unauffindbar.
+  Lösung: kompakte Liste „Schon auf deiner Karte“ (eine Zeile je Eintrag, zugeklappt), eigene Einträge markiert/zuerst, Suche/Filter.
+  Beim Hinzufügen Warnung bei ähnlichem Namen: „Gaming gibt es schon – trotzdem anlegen?“
+- „Wie lange?“: Einheit wählbar Minuten / Stunden / Tage (PC-Spiel in Stunden). Intern immer in Minuten speichern und umrechnen,
+  damit alte Einträge, Verlauf und PDF stimmen. Standard je Verhalten sinnvoll vorbelegen (Gaming: Stunden).
+
+**Optik „runder“ (Inspiration: Insight Timer, MoodMission, Anxiety Check-In)**
+- Erster Start: eine Frage „Wie ausführlich möchtest du deine Karte?“ mit großen Antworten (Einfach / Standard / Ausführlich / Vorlage meiner Therapeutin)
+- Schnell-Karte als Schritt-für-Schritt: eine Frage pro Bildschirm, Fortschrittsbalken
+- Formen: Karten stark gerundet (ca. 20 px), Knöpfe und Chips als Pillen, Wertewahl als runde Punkte, weiche Schatten statt Rahmen, mehr Abstand
+- Schrift mit runden Formen (z. B. Nunito), lokal mitgeliefert, nicht von Google laden (Datenschutz, offline)
+- Farben gedämpft, sanfte Verläufe, je Bereich nur ein Akzent. Keine Vollfarben, keine großen Fotos (Dissoziation, Krise)
+
 - Fingerabdruck-Entsperrung (Plugin nötig)
 - eigenes kleines Mitteilungs-Symbol (Android zeigt sonst ein einfaches Symbol)
 - PDF direkt in der App erzeugen statt über den Browser

@@ -95,6 +95,14 @@ export async function zeigeSchnellkarte(datum = todayISO()) {
       <button class="primary" id="sk-weiter"></button>
     </div>`, { klasse: 'schnell sk' });
   const anzeige = (f) => (hasValue(werte[f.id]) ? (werte[f.id] === true ? 'Ja' : werte[f.id] === false ? 'Nein' : werte[f.id]) : '–');
+  let gesperrtBis = 0;
+  // Ohne Wahl ist „Überspringen“ ein leiser Knopf, mit Wahl ein deutliches „Weiter“
+  const weiterBeschriften = (id) => {
+    const weiter = box.querySelector('#sk-weiter');
+    const da = hasValue(werte[id]);
+    weiter.className = da ? 'primary' : 'ghost';
+    weiter.innerHTML = `${da ? 'Weiter' : 'Überspringen'} ${icon('rechts', 18)}`;
+  };
   const zeigen = () => {
     const ende = i === n;
     const f = felder[i];
@@ -109,7 +117,8 @@ export async function zeigeSchnellkarte(datum = todayISO()) {
     box.querySelector('#sk-zurueck').disabled = i === 0;
     const weiter = box.querySelector('#sk-weiter');
     weiter.hidden = ende;
-    if (!ende) weiter.innerHTML = `${hasValue(werte[f.id]) ? 'Weiter' : 'Überspringen'} ${icon('rechts', 18)}`;
+    if (!ende) weiterBeschriften(f.id);
+    gesperrtBis = Date.now() + 400; // Doppeltipp an derselben Stelle überspringt keine Frage
     box.querySelector('#schnell-speichern').className = ende ? 'primary' : 'ghost';
     box.querySelector('.sk-frage').focus({ preventScroll: true });
   };
@@ -127,10 +136,10 @@ export async function zeigeSchnellkarte(datum = todayISO()) {
       x.classList.toggle('on', an);
       x.setAttribute('aria-pressed', an);
     });
-    box.querySelector('#sk-weiter').innerHTML = `${hasValue(werte[b.dataset.sf]) ? 'Weiter' : 'Überspringen'} ${icon('rechts', 18)}`;
+    weiterBeschriften(b.dataset.sf);
   });
   box.querySelector('#sk-zurueck').onclick = () => gehe(i - 1);
-  box.querySelector('#sk-weiter').onclick = () => gehe(i + 1);
+  box.querySelector('#sk-weiter').onclick = () => { if (Date.now() >= gesperrtBis) gehe(i + 1); };
   // Wischen (nur Zusatz zu den Knöpfen): deutlich waagerecht, mindestens 60 px
   const flaeche = box.querySelector('.sk-schritt');
   let start = null;

@@ -70,7 +70,7 @@ export function renderDatenschutz() {
 
       <h3>Kein Medizinprodukt</h3>
       <p>Das Tagebuch hilft dir, dich selbst zu beobachten und die Therapie vorzubereiten. Es stellt keine Diagnosen, gibt keine Behandlungsempfehlungen
-      und ersetzt keine Therapie oder ärztliche Hilfe. In einer Krise: ♥ oben rechts, Notruf 112 oder Telefonseelsorge 0800 111 0 111.</p>
+      und ersetzt keine Therapie oder ärztliche Hilfe. In einer Krise: das ♥ oben, Notruf 112 oder Telefonseelsorge 0800 111 0 111.</p>
     </div>`;
 }
 
@@ -84,6 +84,7 @@ export async function renderDaten() {
       <h2>Aussehen</h2>
       <p class="meta">Wann hell, wann dunkel? „Automatisch“ folgt der Einstellung des Geräts.</p>
       <div class="segment">${Object.entries(MODI).map(([k, t]) => `<button type="button" data-act="design" data-key="modus" data-wert="${k}" class="${d.modus === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+      <label class="check gross"><input type="checkbox" id="design-ruhig" ${d.ruhig ? 'checked' : ''}> <span><b>Ruhige Darstellung</b><br><small class="meta">Ohne Farbverläufe und Bewegung – hilfreich, wenn Farben gerade zu viel sind.</small></span></label>
       <h3 class="unterkopf">Helles Design</h3>
       <div class="themenwahl">${Object.entries(HELL).map(([k, t]) => `
         <button type="button" data-act="design" data-key="thema" data-wert="${k}" class="${d.thema === k ? 'on' : ''}">
@@ -93,9 +94,6 @@ export async function renderDaten() {
       <div class="themenwahl">${Object.entries(NACHT).map(([k, t]) => `
         <button type="button" data-act="design" data-key="nacht" data-wert="${k}" class="${d.nacht === k ? 'on' : ''}">
           <span class="farbpunkte"><span style="background:#1C1F22"></span><span style="background:#E4E1DA"></span><span style="background:${t.farbe}"></span></span>${t.name}</button>`).join('')}</div>
-      <h3 class="unterkopf">Ruhige Darstellung</h3>
-      <label class="check"><input type="checkbox" id="design-ruhig" ${d.ruhig ? 'checked' : ''}> Ohne Farbverläufe und Bewegung</label>
-      <p class="meta">Flache, ruhige Flächen – hilfreich, wenn Farben oder Bewegung gerade zu viel sind.</p>
     </div>
     <div class="karte">
       <h2>Sanfter Hinweis bei hohen Werten</h2>

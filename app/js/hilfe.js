@@ -12,7 +12,7 @@ export function zeigeHinweis() {
     () => `<h2>Willkommen</h2>
       <p>Dieses Tagebuch hilft dir, dich selbst zu beobachten und deine Therapie vorzubereiten. Es stellt keine Diagnose und ersetzt keine Therapie.</p>
       <p><strong>In einer Krise</strong> oder wenn du daran denkst, dir etwas anzutun: Notruf <strong>112</strong> oder Telefonseelsorge <strong>0800 111 0 111</strong>
-      (kostenlos, rund um die Uhr). Hilfe findest du jederzeit über das <strong>♥</strong> oben rechts.</p>`,
+      (kostenlos, rund um die Uhr). Hilfe findest du jederzeit über das <strong>♥</strong> – oben in der App und in jedem Fenster.</p>`,
     () => `<h2>Deine Daten gehören dir</h2>
       <p><strong>Deine Einträge bleiben nur auf diesem Gerät.</strong> Niemand sonst kann sie sehen – auch nicht die Entwickler, die Klinik oder eine andere Stelle.
       Es gibt keine Kopie im Internet.</p>
@@ -54,14 +54,20 @@ export function zeigeHinweis() {
         </div>`, { schliessbar: false, klasse: 'tour' });
       box.querySelector('#tour-skip')?.addEventListener('click', fertig);
       box.querySelector('#tour-zurueck')?.addEventListener('click', () => { i -= 1; zeigen(); });
-      box.querySelector('#tour-weiter').addEventListener('click', () => { if (letzter) fertig(); else { i += 1; zeigen(); } });
+      const ab = Date.now() + 400; // Doppeltipp überspringt keinen Schritt
+      box.querySelector('#tour-weiter').addEventListener('click', () => { if (Date.now() < ab) return; if (letzter) fertig(); else { i += 1; zeigen(); } });
       let gewaehlt = false;
       box.querySelectorAll('[data-tour-preset]').forEach((b) => b.addEventListener('click', async () => {
         if (gewaehlt) return; // Doppelklick
         gewaehlt = true;
+        b.classList.add('on'); // Wahl kurz sichtbar machen, dann weiter
+        b.setAttribute('aria-pressed', 'true');
         const neu = presetFelder(b.dataset.tourPreset, state.config.fields);
         if (commitTemplate(state.config, neu)) await saveConfig();
         toast(`„${b.querySelector('b').textContent}“ gewählt`);
+        const hier = i;
+        await new Promise((r) => setTimeout(r, 450));
+        if (i !== hier) return; // inzwischen schon weiter- oder zurückgegangen
         i = Math.min(i + 1, schritte.length - 1);
         zeigen();
       }));
@@ -95,6 +101,6 @@ const HILFE = {
 export function zeigeHilfe() {
   const [titel, ...absaetze] = HILFE[state.view] ?? HILFE.woche;
   openModal(`<h2>${esc(titel)}</h2>${absaetze.map((a) => `<p>${esc(a)}</p>`).join('')}
-    <p class="meta">In einer Krise: ♥ oben rechts. Einführung wiederholen: Mehr → Einstellungen &amp; Daten.</p>
+    <p class="meta">In einer Krise: das ♥ oben. Einführung wiederholen: Mehr → Einstellungen &amp; Daten.</p>
     <div class="actions"><button class="primary" data-modal-zu>Okay</button></div>`, { klasse: 'hilfe' });
 }

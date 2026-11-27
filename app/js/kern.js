@@ -1,4 +1,4 @@
-// Gemeinsamer Zustand und Ereignis-Verteiler. Wird von allen Oberflächen-Modulen genutzt, importiert selbst keines davon.
+// Gemeinsamer Zustand und Ereignis-Verteiler. Wird von allen Oberflächen-Modulen genutzt, importiert selbst keines davon (nur die Ketten-Fabrik aus ketten.js).
 import * as db from './db.js';
 import { todayISO } from './model.js';
 import { kettenModul } from './ketten.js';
@@ -31,6 +31,14 @@ export const ton = () => (TONFAELLE[E().tonfall] ? E().tonfall : 'klar');
 /** Feldname mit Bereich, wo der Name allein unklar wäre (z. B. „Gaming – Wie lange“) */
 export const feldTitel = (f) => (/^(Problemverhalten|Verhalten|Neue Wege): /.test(f.group ?? '')
   ? `${f.group.split(': ').slice(1).join(': ')} – ${f.name}` : f.name);
+/** Feld der aktuellen Vorlage zu einer ID */
+export const feldNach = (id) => state.config.fields.find((x) => x.id === id);
+/** Filter für „Nur das Wichtigste“: ohne Kurzansicht ist jedes Feld sichtbar */
+export function kurzFilter() {
+  const kurz = !!E().kurzansicht;
+  const kurzSet = new Set(state.config.kurzFelder ?? []);
+  return (f) => !kurz || kurzSet.has(f.id);
+}
 
 // ---------- Ansicht wechseln (setzt app.js – so brauchen die Module keinen Rückimport) ----------
 export const nav = { zeige: async () => {}, neuZeichnen: async () => {} };
@@ -40,8 +48,9 @@ const KLICK = new Map();
 /** Klick-Aktionen (data-act → Funktion) anmelden. Jede Aktion gehört genau einem Modul. */
 export function aufKlick(aktionen) {
   for (const [act, fn] of Object.entries(aktionen)) {
-    if (KLICK.has(act)) throw new Error(`Aktion doppelt angemeldet: ${act}`);
-    KLICK.set(act, fn);
+    // Nicht werfen: ein Fehler beim Laden würde die ganze App (auch ♥) lahmlegen
+    if (KLICK.has(act)) console.error(`Aktion doppelt angemeldet: ${act}`);
+    else KLICK.set(act, fn);
   }
 }
 $main.addEventListener('click', async (e) => {
@@ -54,8 +63,8 @@ const SENDEN = new Map();
 /** Formulare (id → Funktion) anmelden. Absenden lädt nie die Seite neu (außer in den Ketten, die das selbst regeln). */
 export function aufSenden(formulare) {
   for (const [id, fn] of Object.entries(formulare)) {
-    if (SENDEN.has(id)) throw new Error(`Formular doppelt angemeldet: ${id}`);
-    SENDEN.set(id, fn);
+    if (SENDEN.has(id)) console.error(`Formular doppelt angemeldet: ${id}`);
+    else SENDEN.set(id, fn);
   }
 }
 $main.addEventListener('submit', async (e) => {

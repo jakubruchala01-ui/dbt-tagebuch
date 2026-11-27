@@ -2,7 +2,7 @@
 import { todayISO, hasValue, fieldsForEntry, istMinuten, dauerText, ZEIT_EINHEITEN } from './model.js';
 import { MED_EINHEITEN, kategorie } from './defaults.js';
 import { esc, groupBy, toast, openModal, closeModal, icon } from './ui.js';
-import { $main, E, state, saveConfig } from './kern.js';
+import { $main, E, state, saveConfig, feldNach, kurzFilter } from './kern.js';
 
 // ---------- Wörter für Skalen 0–5 ----------
 const STUFEN_DRANG = ['kein Drang', 'kaum spürbar', 'leicht', 'deutlich', 'stark', 'kaum auszuhalten'];
@@ -13,9 +13,7 @@ const stufenText = (f, v) => { const st = stufenVon(f); return st && hasValue(v)
 
 /** Ein Bereich der Tageskarte (aufklappbar) */
 export function gruppeHtml(g, fs, { versteckt = false } = {}) {
-  const kurz = !!E().kurzansicht;
-  const kurzSet = new Set(state.config.kurzFelder ?? []);
-  const sichtbarKurz = (f) => !kurz || kurzSet.has(f.id);
+  const sichtbarKurz = kurzFilter();
   const sichtbar = fs.filter(sichtbarKurz);
   return `<details class="kasten gruppe-k kat-${kategorie(g)} ${sichtbar.length ? '' : 'kurz-aus'}" data-gruppe="${esc(g)}" ${state.zu?.has(g) ? '' : 'open'} ${versteckt ? 'hidden' : ''}>
     <summary><span class="kat-punkt" aria-hidden="true"></span><span>${esc(g)}</span><span class="fortschritt" data-fortschritt="${esc(g)}"></span>${icon('runter', 18)}</summary>
@@ -28,12 +26,11 @@ export const gruppeHatWerte = (fs) => fs.some((f) => hasValue(state.entry.values
 
 /** Fortschritt pro Bereich: „3/6“ ausgefüllt */
 export function updFortschritt() {
-  const kurz = !!E().kurzansicht;
-  const kurzSet = new Set(state.config.kurzFelder ?? []);
+  const sichtbarKurz = kurzFilter();
   groupBy(fieldsForEntry(state.config, state.entry), (f) => f.group || 'Allgemein').forEach(([g, fs]) => {
     const el = $main.querySelector(`[data-fortschritt="${CSS.escape(g)}"]`);
     if (!el) return;
-    const liste = fs.filter((f) => !kurz || kurzSet.has(f.id));
+    const liste = fs.filter(sichtbarKurz);
     const voll = liste.filter((f) => hasValue(state.entry.values[f.id])).length;
     el.textContent = `${voll}/${liste.length}`;
     el.classList.toggle('voll', voll === liste.length && liste.length > 0);
@@ -49,7 +46,7 @@ function infoKnopf(f) {
 }
 
 export function zeigeInfo(fid, nachher = () => {}) {
-  const f = state.config.fields.find((x) => x.id === fid) ?? state.draftFields?.find((x) => x.id === fid);
+  const f = feldNach(fid) ?? state.draftFields?.find((x) => x.id === fid);
   const info = { text: '', notiz: '', klaeren: false, ...state.config.feldInfo?.[fid] };
   const box = openModal(`
     <h2>${esc(f?.name ?? 'Feld')} ${f?.hint ? `<small class="meta">${esc(f.hint)}</small>` : ''}</h2>
@@ -158,7 +155,7 @@ export function updStepper(id) {
   sb.setAttribute('aria-valuetext', hasValue(v) ? `${v} von ${sb.getAttribute('aria-valuemax')}` : 'offen, noch kein Wert');
   box.querySelectorAll('.seg').forEach((s) => s.classList.toggle('an', hasValue(v) && +s.dataset.value <= v));
   const st = box.querySelector('.skalentext');
-  if (st) st.textContent = stufenText(state.config.fields.find((x) => x.id === id), v);
+  if (st) st.textContent = stufenText(feldNach(id), v);
   const r = box.querySelector('input[type=range]');
   if (r) { r.value = hasValue(v) ? v : r.min; r.classList.toggle('unset', !hasValue(v)); }
 }

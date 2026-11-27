@@ -141,7 +141,7 @@ export async function renderWoche() {
   const von = wochenbeginn(state.wocheDatum, start);
   const tage = Array.from({ length: 7 }, (_, i) => shiftDate(von, i));
   const vorTage = tage.map((d) => shiftDate(d, -7));
-  const alle = await db.getAllEntries();
+  const [alle, kettenAlle] = await Promise.all([db.getAllEntries(), db.getAllKetten()]);
   const byDate = new Map(alle.map((e) => [e.date, e]));
   const heute = todayISO();
   const istAktuell = tage.includes(heute);
@@ -149,7 +149,7 @@ export async function renderWoche() {
   const vorher = vorTage.map((d) => byDate.get(d));
   const zaehle = (list, fn) => list.filter((e) => e && fn(e)).length;
   const kf = kennFeld();
-  const kettenWoche = (await db.getAllKetten()).filter((k) => !k.archiviert && k.date >= tage[0] && k.date <= tage[6]);
+  const kettenWoche = kettenAlle.filter((k) => !k.archiviert && k.date >= tage[0] && k.date <= tage[6]);
   const heuteEintrag = byDate.get(heute);
   const letzter = alle.map((e) => e.date).filter((d) => d < heute).sort().at(-1);
   const fehlend = fehlendeTage(alle, heute);

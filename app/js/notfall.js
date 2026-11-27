@@ -1,44 +1,18 @@
-// Hilfe in der Krise: ♥-Fenster, Notfallkontakte, Notfallplan, Krisenhinweis und Rückmeldung nach dem Speichern.
+// Hilfe in der Krise: ♥-Fenster, Notfallkontakte, Notfallplan, Krisenhinweis.
 import { hasValue } from './model.js';
 import { esc, toast, openModal, frage, icon } from './ui.js';
 import { uebungenListe } from './uebungen.js';
-import { $main, E, state, saveConfig, ton, feldTitel, aufKlick, aufSenden } from './kern.js';
-import { erinnerungenAktualisieren } from './erinnerung.js';
+import { $main, E, state, saveConfig, aufKlick, aufSenden, feldNach } from './kern.js';
 
-// ---------- Anerkennende Rückmeldung & sanftes Angebot ----------
-const ANERKENNUNG = {
-  sanft: [
-    'Danke, dass du heute hingeschaut hast.',
-    'Eingetragen. Jeder Eintrag ist Selbstbeobachtung – egal, wie der Tag war.',
-    'Gespeichert. Du musst nichts perfekt machen, um dranzubleiben.',
-    'Danke dir. Auch ein schwerer Tag ist wertvolle Information für dich und deine Therapie.',
-    'Notiert. Schön, dass du dir die Zeit genommen hast.',
-    'Erledigt. Kleine Schritte zählen.',
-  ],
-  klar: [
-    'Gespeichert. Gut, dass du drangeblieben bist.',
-    'Erledigt für heute. Das hilft dir und deiner Therapie.',
-    'Eingetragen – danke. Morgen wieder.',
-    'Gespeichert. Auch schwere Tage sind wichtige Information.',
-  ],
-  direkt: ['Gespeichert.', 'Erledigt. Morgen wieder.', 'Karte gespeichert.'],
-};
-const zufall = (liste) => liste[Math.floor(Math.random() * liste.length)];
-
-/** Felder, bei denen ein hoher Wert Belastung bedeutet (nicht z. B. Selbstmitgefühl oder Schlaf) */
-const istBelastend = (f) => f.type === 'scale' && (['f_belastung', 'f_suizid', 'f_dissoziation'].includes(f.id) || /drang/i.test(`${f.id} ${f.name}`));
-
-function hoheWerte(values) {
-  const schwelle = E().hinweisSchwelle ?? 0.8;
-  return state.config.fields.filter((f) => istBelastend(f) && hasValue(values?.[f.id]) && (values[f.id] - f.min) / (f.max - f.min) >= schwelle);
-}
+/** Übungsliste in kompakter Form (Krisen- und Hinweisfenster) */
+export const uebungenKompakt = () => uebungenListe().replace('class="uebungen-liste"', 'class="uebungen-liste kompakt"');
 
 /** Suizidgedanken ab 4 von 5 (bzw. 70 % der Skala) */
 export function suizidHoch(values) {
-  const f = state.config.fields.find((x) => x.id === 'f_suizid');
+  const f = feldNach('f_suizid');
   return !!f && hasValue(values?.f_suizid) && (values.f_suizid - f.min) / (f.max - f.min) >= 0.7;
 }
-const KRISEN_HTML = `
+export const KRISEN_HTML = `
   <div class="notfallnummern">
     <a class="notruf" href="tel:112"><b>112</b><small>Notruf (Rettungsdienst)</small></a>
     <a href="tel:08001110111"><b>0800 111 0 111</b><small>Telefonseelsorge – kostenlos, rund um die Uhr</small></a>
@@ -52,27 +26,6 @@ export function zeigeKrisenHinweis() {
       <button class="primary" data-notfall>${icon('herz', 16)} Mein Notfallplan &amp; Kontakte</button>
       <button class="ghost" data-modal-zu>Weiter eintragen</button>
     </div>`, { klasse: 'sanft' });
-}
-
-export function rueckmeldung(values) {
-  toast(zufall(ANERKENNUNG[ton()]));
-  erinnerungenAktualisieren();
-  const hoch = hoheWerte(values);
-  const krise = suizidHoch(values);
-  if (!krise && (!hoch.length || E().sanfterHinweis === false)) return;
-  setTimeout(() => {
-    openModal(`
-      <h2>Heute war viel los.</h2>
-      <p>${hoch.map((f) => esc(feldTitel(f))).join(', ')} ${hoch.length > 1 ? 'waren' : 'war'} hoch. Das ist kein Fehler – nur ein Hinweis, gut für dich zu sorgen.</p>
-      ${krise ? `<p>Bei starken Suizidgedanken: <strong>Ruf an, wenn du in Gefahr bist.</strong></p>${KRISEN_HTML}` : ''}
-      <p>Magst du jetzt einen Skill ausprobieren?</p>
-      ${uebungenListe().replace('class="uebungen-liste"', 'class="uebungen-liste kompakt"')}
-      <div class="actions dialog-knoepfe">
-        <button class="ghost" data-modal-zu>Nicht jetzt</button>
-        <button class="ghost" data-notfall>${icon('herz', 16)} Notfallplan</button>
-      </div>
-      <p class="meta">Diesen Hinweis kannst du unter Mehr → Einstellungen anpassen oder ausschalten.</p>`, { klasse: 'sanft' });
-  }, 900);
 }
 
 // ---------- Notfall & Hinweis ----------
@@ -96,7 +49,7 @@ export function zeigeNotfall({ gesperrt = false } = {}) {
     </div>
     ${privat && E().notfallPlan ? `<h3>Mein Notfallplan</h3><div class="notfallplan">${esc(E().notfallPlan).replace(/\n/g, '<br>')}</div>` : ''}
     <h3>Skill jetzt üben</h3>
-    ${uebungenListe().replace('class="uebungen-liste"', 'class="uebungen-liste kompakt"')}
+    ${uebungenKompakt()}
     ${notSkills.length ? `<h3>Meine Notfall-Skills</h3><ul class="notfallskills">${notSkills.map((s) => `<li><b>${esc(s.name)}</b>${s.description ? ` – ${esc(s.description)}` : ''}</li>`).join('')}</ul>` : ''}
     <p class="meta">Eigene Kontakte und Notfallplan: Mehr → Einstellungen. Notfall-Skills: Mehr → Skills.</p>`, { klasse: 'notfall' });
 }

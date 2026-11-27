@@ -2,7 +2,7 @@
 import * as db from './db.js';
 import { todayISO, currentVersion, templateChanged, hasValue, cleanEntry, rememberMeds } from './model.js';
 import { esc, frage, icon } from './ui.js';
-import { state, saveConfig, ketten } from './kern.js';
+import { state, saveConfig, ketten, feldNach } from './kern.js';
 import { erinnerungenAktualisieren } from './erinnerung.js';
 import { suizidHoch, zeigeKrisenHinweis } from './notfall.js';
 import { updFortschritt, updStepper } from './felder.js';
@@ -64,7 +64,7 @@ async function speichereEntry() {
 
 /** Wert eines Skalenfelds ändern (−/+ Tasten, Balken, Tastatur) */
 export function schritt(id, delta, direkt = null) {
-  const f = state.config.fields.find((x) => x.id === id);
+  const f = feldNach(id);
   const v = state.entry.values[id];
   let neu;
   if (direkt !== null) neu = direkt === v ? +(v - f.step).toFixed(4) : direkt; // nochmal tippen = eins weniger

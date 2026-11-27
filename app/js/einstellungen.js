@@ -204,7 +204,6 @@ export async function vervollstaendigeConfig() {
   state.config.skills ??= [];
   state.config.medikamente ??= [];
   state.config.stundenNotizen ??= [];
-  // Schnell-Karte: Standardfelder einmalig setzen
   // Schnell-Karte: die 6 Befinden-Werte (Belastung bis Vertrauen in die Therapie). Einmalig umstellen, danach frei wählbar.
   if (!state.config.schnellV2) {
     state.config.schnellFelder = BEFINDEN_IDS.filter((id) => state.config.fields.some((f) => f.id === id));
@@ -215,7 +214,6 @@ export async function vervollstaendigeConfig() {
   if (!state.config.kurzFelder) {
     state.config.kurzFelder = ['f_belastung', 'f_selbstmitgefuehl', 'f_suizid', 'f_dissoziation', 'f_skills', 'f_pv_essen_drang', 'f_pv_essen_handlung', 'f_v1_drang', 'f_v1_gemacht', 'f_meds']
       .filter((id) => state.config.fields.some((f) => f.id === id));
-    await saveConfig();
   }
   if (!state.config.feldInfoInit) {
     state.config.feldInfo ??= {};
@@ -223,7 +221,6 @@ export async function vervollstaendigeConfig() {
       if (!state.config.feldInfo[id] && state.config.fields.some((f) => f.id === id)) state.config.feldInfo[id] = { notiz: '', ...info };
     }
     state.config.feldInfoInit = true;
-    await saveConfig();
   }
   // Standard-Notfall-Skills einmalig markieren
   if (!state.config.notfallMarkiert) {

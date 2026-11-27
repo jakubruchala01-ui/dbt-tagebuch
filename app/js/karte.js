@@ -1,14 +1,63 @@
-// Tageskarte: Anzeige, Eingaben, Schnell-Karte und Übungen als Skill eintragen.
+// Tageskarte: Anzeige, Eingaben, Rückmeldung nach dem Speichern, Schnell-Karte und Übungen als Skill eintragen.
 import * as db from './db.js';
 import { clone, todayISO, shiftDate, formatDate, currentVersion, hasValue, fieldsForEntry, cleanEntry } from './model.js';
 import { kategorie } from './defaults.js';
 import { esc, datumKurz, groupBy, toast, WOCHENTAGE, wochentag, openModal, closeModal, icon } from './ui.js';
-import { $main, E, state, saveConfig, ketten, feldTitel, nav, aufKlick, aufSenden } from './kern.js';
+import { $main, E, state, saveConfig, ketten, feldTitel, nav, aufKlick, aufSenden, feldNach, kurzFilter, ton } from './kern.js';
 import { erinnerungenAktualisieren } from './erinnerung.js';
-import { rueckmeldung } from './notfall.js';
+import { suizidHoch, KRISEN_HTML, uebungenKompakt } from './notfall.js';
 import { gruppeHtml, fieldInput, gruppeHatWerte, updFortschritt, zeigeInfo, infoKnoepfeAktualisieren, updStepper, refreshMeds } from './felder.js';
 import { leaveOk, autoSpeichernJetzt, autoSpeichern, schritt, setValue } from './eintrag.js';
 import { draengeKasten, skillsBlock, updateSkillCount } from './draenge.js';
+
+// ---------- Anerkennende Rückmeldung & sanftes Angebot ----------
+const ANERKENNUNG = {
+  sanft: [
+    'Danke, dass du heute hingeschaut hast.',
+    'Eingetragen. Jeder Eintrag ist Selbstbeobachtung – egal, wie der Tag war.',
+    'Gespeichert. Du musst nichts perfekt machen, um dranzubleiben.',
+    'Danke dir. Auch ein schwerer Tag ist wertvolle Information für dich und deine Therapie.',
+    'Notiert. Schön, dass du dir die Zeit genommen hast.',
+    'Erledigt. Kleine Schritte zählen.',
+  ],
+  klar: [
+    'Gespeichert. Gut, dass du drangeblieben bist.',
+    'Erledigt für heute. Das hilft dir und deiner Therapie.',
+    'Eingetragen – danke. Morgen wieder.',
+    'Gespeichert. Auch schwere Tage sind wichtige Information.',
+  ],
+  direkt: ['Gespeichert.', 'Erledigt. Morgen wieder.', 'Karte gespeichert.'],
+};
+const zufall = (liste) => liste[Math.floor(Math.random() * liste.length)];
+
+/** Felder, bei denen ein hoher Wert Belastung bedeutet (nicht z. B. Selbstmitgefühl oder Schlaf) */
+const istBelastend = (f) => f.type === 'scale' && (['f_belastung', 'f_suizid', 'f_dissoziation'].includes(f.id) || /drang/i.test(`${f.id} ${f.name}`));
+
+function hoheWerte(values) {
+  const schwelle = E().hinweisSchwelle ?? 0.8;
+  return state.config.fields.filter((f) => istBelastend(f) && hasValue(values?.[f.id]) && (values[f.id] - f.min) / (f.max - f.min) >= schwelle);
+}
+
+function rueckmeldung(values) {
+  toast(zufall(ANERKENNUNG[ton()]));
+  erinnerungenAktualisieren();
+  const hoch = hoheWerte(values);
+  const krise = suizidHoch(values);
+  if (!krise && (!hoch.length || E().sanfterHinweis === false)) return;
+  setTimeout(() => {
+    openModal(`
+      <h2>Heute war viel los.</h2>
+      <p>${hoch.map((f) => esc(feldTitel(f))).join(', ')} ${hoch.length > 1 ? 'waren' : 'war'} hoch. Das ist kein Fehler – nur ein Hinweis, gut für dich zu sorgen.</p>
+      ${krise ? `<p>Bei starken Suizidgedanken: <strong>Ruf an, wenn du in Gefahr bist.</strong></p>${KRISEN_HTML}` : ''}
+      <p>Magst du jetzt einen Skill ausprobieren?</p>
+      ${uebungenKompakt()}
+      <div class="actions dialog-knoepfe">
+        <button class="ghost" data-modal-zu>Nicht jetzt</button>
+        <button class="ghost" data-notfall>${icon('herz', 16)} Notfallplan</button>
+      </div>
+      <p class="meta">Diesen Hinweis kannst du unter Mehr → Einstellungen anpassen oder ausschalten.</p>`, { klasse: 'sanft' });
+  }, 900);
+}
 
 // ---------- Schnell-Karte (ca. 30 Sekunden) ----------
 export async function zeigeSchnellkarte(datum = todayISO()) {
@@ -70,24 +119,28 @@ export async function trageUebungEin(u, wirkung) {
 
 // ---------- Tageskarte ----------
 export async function renderHeute() {
-  const stored = await db.getEntry(state.date);
+  const [stored, kettenAlle, ...vortage] = await Promise.all([
+    db.getEntry(state.date),
+    db.getAllKetten(),
+    ...Array.from({ length: 14 }, (_, i) => db.getEntry(shiftDate(state.date, -(i + 1)))),
+  ]);
   state.entry = stored ? clone(stored) : { date: state.date, values: {}, skills: {}, status: 'entwurf' };
   state.entry.status ??= 'entwurf';
   state.entryDirty = false;
   state.entryHatteWerte = Object.keys(state.entry.values ?? {}).length > 0;
   const fields = fieldsForEntry(state.config, stored);
   const isToday = state.date === todayISO();
-  const kettenTag = (await db.getAllKetten()).filter((k) => k.date === state.date && !k.archiviert);
+  const kettenTag = kettenAlle.filter((k) => k.date === state.date && !k.archiviert);
+  // „Zuletzt genutzt“: Skills des letzten Tages (bis 14 Tage zurück), an dem welche genutzt wurden
   state.skillsZuletzt = [];
-  for (let i = 1; i <= 14 && !state.skillsZuletzt.length; i++) {
-    const e = await db.getEntry(shiftDate(state.date, -i));
+  for (const e of vortage) {
     state.skillsZuletzt = Object.keys(e?.skills ?? {}).filter((id) => e.skills[id]?.used);
+    if (state.skillsZuletzt.length) break;
   }
   const zuKlaeren = E().klaerenAusgeblendet === todayISO() ? 0 : fields.filter((f) => state.config.feldInfo?.[f.id]?.klaeren).length;
 
   const kurz = !!E().kurzansicht;
-  const kurzSet = new Set(state.config.kurzFelder ?? []);
-  const sichtbarKurz = (f) => !kurz || kurzSet.has(f.id);
+  const sichtbarKurz = kurzFilter();
   const fertig = state.entry.status === 'abgeschlossen';
 
   $main.innerHTML = `
@@ -109,8 +162,7 @@ export async function renderHeute() {
         const gruppen = groupBy(fields, (f) => f.group || 'Allgemein');
         const istDrang = (g) => kategorie(g) === 'problem';
         state.kartenFelder = fields;
-        const kurzSet = new Set(state.config.kurzFelder ?? []);
-        const dg = gruppen.filter(([g, fs]) => istDrang(g) && (!kurz || fs.some((f) => kurzSet.has(f.id))));
+        const dg = gruppen.filter(([g, fs]) => istDrang(g) && (!kurz || fs.some(sichtbarKurz)));
         if (state.drangOffen?.datum !== state.date) {
           state.drangOffen = { datum: state.date, set: new Set(dg.filter(([, fs]) => gruppeHatWerte(fs)).map(([g]) => g)) };
         }
@@ -166,7 +218,7 @@ aufKlick({
   seg: (el) => schritt(el.dataset.field, 0, +el.dataset.value),
   wahl: (el) => {
     const id = el.dataset.field;
-    const f = state.config.fields.find((x) => x.id === id);
+    const f = feldNach(id);
     const w = el.dataset.wert;
     let liste = [...(state.entry.values[id] ?? [])];
     if (liste.includes(w)) liste = liste.filter((x) => x !== w);
@@ -241,7 +293,7 @@ $main.addEventListener('keydown', (e) => {
   const sb = e.target.closest?.('[role=spinbutton]');
   if (!sb || state.view !== 'heute') return;
   const id = sb.dataset.field;
-  const f = state.config.fields.find((x) => x.id === id);
+  const f = feldNach(id);
   const tasten = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 };
   if (e.key in tasten) schritt(id, tasten[e.key]);
   else if (e.key === 'Home') schritt(id, 0, f.min);
@@ -287,7 +339,7 @@ $main.addEventListener('change', async (e) => {
     state.config.einheitWahl = { ...state.config.einheitWahl, [t.dataset.einheitwahl]: t.value };
     await saveConfig();
     const box = t.closest('.field');
-    const f = state.config.fields.find((x) => x.id === t.dataset.einheitwahl);
+    const f = feldNach(t.dataset.einheitwahl);
     box.outerHTML = fieldInput(f);
     return;
   }

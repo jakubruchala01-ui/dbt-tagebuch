@@ -73,7 +73,12 @@ Dann auf GitHub unter *Settings → Secrets and variables → Actions → New re
 
 ## Noch offen / später
 
-**ALLERERSTES (Fehler, 27.11.2026): PDF in der Handy-App liefert nur eine HTML-Datei – nutzlos**
+**Erledigt 28.11. (APK v0.1.6, auf dem Handy noch zu testen):** PDF über Android-Druckdialog (`native/android/DruckPlugin.java`),
+keine Cloud-Sicherung/Geräte-Übertragung (allowBackup=false + dataExtractionRules), Exportkopie wird aus dem Cache gelöscht,
+neutrale Mitteilung („Tagebuch“), CSP strenger. Datenschutz-Prüfung: `testberichte/8-Datenschutz-Pruefung.md`.
+Offen daraus: Texte der Datenschutzseite ergänzen (Druckdienst, Teilen, Tastatur, Bildschirmfotos), Schalter „Notfallkontakte auf dem Sperrbildschirm zeigen“.
+
+**(erledigt, siehe oben) PDF in der Handy-App lieferte nur eine HTML-Datei**
 - Ursache: In der APK gibt es keinen Druckdialog, `berichtAlsDatei()` teilt deshalb HTML.
 - Lösung A (bevorzugt): Android-Druckdialog über ein Druck-Plugin → „Als PDF speichern“, gleiches Layout wie im Browser.
   Plugin vorher prüfen (gepflegt, keine Netzwerkzugriffe, Capacitor 7).

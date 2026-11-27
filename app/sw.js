@@ -1,5 +1,5 @@
 // Offline-Fähigkeit: erst Netz (lokaler Server), sonst Kopie aus dem Cache.
-const CACHE = 'dbt-tagebuch-v14';
+const CACHE = 'dbt-tagebuch-v16';
 const SHELL = ['./', 'index.html', 'style.css', 'bericht.css','js/app.js', 'js/db.js', 'js/model.js', 'js/defaults.js', 'js/bericht.js', 'js/ui.js', 'js/ketten.js', 'js/sicherheit.js', 'js/design.js', 'js/uebungen.js', 'js/plattform.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {

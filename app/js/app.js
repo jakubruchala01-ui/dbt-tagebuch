@@ -3,6 +3,7 @@ import * as db from './db.js';
 import {
   clone, newId, todayISO, shiftDate, formatDate, createInitialConfig, currentVersion,
   templateChanged, commitTemplate, isCommitted, hasValue, fieldsForEntry, validateFields, cleanEntry, applyStandard, rememberMeds,
+  istMinuten, dauerText, ZEIT_EINHEITEN,
 } from './model.js';
 import {
   TYPEN, MODULE, BAUSTEINE, MED_EINHEITEN, FELD_INFO, kategorie, MESSARTEN, MESSART_ENDUNG, VERHALTEN_VORLAGEN, verhaltenFelder,
@@ -97,6 +98,13 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('[data-merken]')) { closeModal(); zeigeMerken(); return; }
   if (e.target.closest('[data-notfall]')) { closeModal(); zeigeNotfall(); }
 });
+
+// ---------- Wörter für Skalen 0–5 ----------
+const STUFEN_DRANG = ['kein Drang', 'kaum spürbar', 'leicht', 'deutlich', 'stark', 'kaum auszuhalten'];
+const STUFEN_WIRKUNG = ['nicht geholfen', 'kaum', 'etwas', 'spürbar', 'deutlich', 'sehr geholfen'];
+/** Wörter für ein Skalenfeld, falls es eine Drang-Skala 0–5 ist */
+const stufenVon = (f) => (f.type === 'scale' && f.min === 0 && f.max === 5 && f.step === 1 && /drang/i.test(`${f.id} ${f.name}`) ? STUFEN_DRANG : null);
+const stufenText = (f, v) => { const st = stufenVon(f); return st && hasValue(v) ? st[v] ?? '' : ''; };
 
 // ---------- Anerkennende Rückmeldung & sanftes Angebot ----------
 const ANERKENNUNG = {
@@ -366,7 +374,8 @@ function kennFeld() {
 }
 
 function problemHandlung(e) {
-  return state.config.fields.some((f) => f.type === 'yesno' && (f.group ?? '').startsWith('Problemverhalten') && e?.values[f.id] === true);
+  // Problemverhalten und eigene Verhalten („Verhalten: …“): Ja bei „Gemacht?“ oder „Wie oft“ > 0
+  return state.config.fields.some((f) => kategorie(f.group ?? '') === 'problem' && ((f.type === 'yesno' && !/skill_statt|gedacht/.test(f.id) && e?.values[f.id] === true) || (f.type === 'number' && /_oft$/.test(f.id) && e?.values[f.id] > 0)));
 }
 
 async function renderWoche() {
@@ -491,6 +500,11 @@ async function renderHeute() {
   const fields = fieldsForEntry(state.config, stored);
   const isToday = state.date === todayISO();
   const kettenTag = (await db.getAllKetten()).filter((k) => k.date === state.date && !k.archiviert);
+  state.skillsZuletzt = [];
+  for (let i = 1; i <= 14 && !state.skillsZuletzt.length; i++) {
+    const e = await db.getEntry(shiftDate(state.date, -i));
+    state.skillsZuletzt = Object.keys(e?.skills ?? {}).filter((id) => e.skills[id]?.used);
+  }
   const zuKlaeren = E().klaerenAusgeblendet === todayISO() ? 0 : fields.filter((f) => state.config.feldInfo?.[f.id]?.klaeren).length;
 
   const kurz = !!E().kurzansicht;
@@ -513,13 +527,23 @@ async function renderHeute() {
       <span><b id="klaeren-zahl">${zuKlaeren}</b> Punkte noch mit der Therapie klären – rotes i antippen für die Erklärung.</span>
       <button type="button" class="ghost klein klaeren-zu" data-act="klaeren-aus" aria-label="Heute ausblenden" title="Heute ausblenden">${icon('x', 16)}</button></p>
     <form id="card" autocomplete="off">
-      ${groupBy(fields, (f) => f.group || 'Allgemein').map(([g, fs]) => {
-        const sichtbar = fs.filter(sichtbarKurz);
-        return `<details class="kasten gruppe-k kat-${kategorie(g)} ${sichtbar.length ? '' : 'kurz-aus'}" data-gruppe="${esc(g)}" ${state.zu?.has(g) ? '' : 'open'}>
-          <summary><span class="kat-punkt" aria-hidden="true"></span><span>${esc(g)}</span><span class="fortschritt" data-fortschritt="${esc(g)}"></span>${icon('runter', 18)}</summary>
-          <div class="gruppe-inhalt">${fs.map((f) => (sichtbarKurz(f) ? fieldInput(f) : '')).join('')}</div>
-        </details>`;
-      }).join('')}
+      ${(() => {
+        const gruppen = groupBy(fields, (f) => f.group || 'Allgemein');
+        const istDrang = (g) => kategorie(g) === 'problem';
+        state.kartenFelder = fields;
+        const kurzSet = new Set(state.config.kurzFelder ?? []);
+        const dg = gruppen.filter(([g, fs]) => istDrang(g) && (!kurz || fs.some((f) => kurzSet.has(f.id))));
+        if (state.drangOffen?.datum !== state.date) {
+          state.drangOffen = { datum: state.date, set: new Set(dg.filter(([, fs]) => gruppeHatWerte(fs)).map(([g]) => g)) };
+        }
+        let kastenFertig = false;
+        return gruppen.map(([g, fs]) => {
+          if (!istDrang(g)) return gruppeHtml(g, fs);
+          if (kastenFertig || !dg.length) return '';
+          kastenFertig = true;
+          return draengeKasten(dg);
+        }).join('');
+      })()}
       <details class="kasten gruppe-k" data-gruppe="__skills" ${state.zu?.has('__skills') || kurz ? '' : 'open'}>
         <summary><span>Skills heute</span><span class="fortschritt" id="skillcount"></span>${icon('runter', 18)}</summary>
         <div class="gruppe-inhalt">${skillsBlock(stored)}</div>
@@ -542,6 +566,49 @@ async function renderHeute() {
     </form>`;
   updateSkillCount();
   updFortschritt();
+}
+
+/** Ein Bereich der Tageskarte (aufklappbar) */
+function gruppeHtml(g, fs, { versteckt = false } = {}) {
+  const kurz = !!E().kurzansicht;
+  const kurzSet = new Set(state.config.kurzFelder ?? []);
+  const sichtbarKurz = (f) => !kurz || kurzSet.has(f.id);
+  const sichtbar = fs.filter(sichtbarKurz);
+  return `<details class="kasten gruppe-k kat-${kategorie(g)} ${sichtbar.length ? '' : 'kurz-aus'}" data-gruppe="${esc(g)}" ${state.zu?.has(g) ? '' : 'open'} ${versteckt ? 'hidden' : ''}>
+    <summary><span class="kat-punkt" aria-hidden="true"></span><span>${esc(g)}</span><span class="fortschritt" data-fortschritt="${esc(g)}"></span>${icon('runter', 18)}</summary>
+    <div class="gruppe-inhalt">${fs.map((f) => (sichtbarKurz(f) ? fieldInput(f) : '')).join('')}</div>
+  </details>`;
+}
+
+const drangName = (g) => g.replace(/^(Problemverhalten|Verhalten):\s*/, '');
+const gruppeHatWerte = (fs) => fs.some((f) => hasValue(state.entry.values[f.id]));
+
+/** Dränge & Verhalten: Kacheln antippen, nur angetippte Bereiche werden gezeigt. Reine Darstellung – Werte bleiben immer erhalten. */
+function draengeKasten(dg) {
+  const offen = state.drangOffen.set;
+  return `<section class="kasten draenge-kasten kat-problem" id="draenge">
+    <h3 class="draenge-titel"><span class="kat-punkt" aria-hidden="true"></span>Dränge &amp; Verhalten heute</h3>
+    <p class="hint">Tippe an, was heute da war – nur das füllst du aus.</p>
+    <div class="chips drang-chips" role="group" aria-label="Dränge und Verhalten">
+      ${dg.map(([g, fs]) => `<button type="button" data-act="drang-kachel" data-g="${esc(g)}" aria-pressed="${offen.has(g)}" class="${offen.has(g) ? 'on' : ''} ${gruppeHatWerte(fs) ? 'mitwert' : ''}">${esc(drangName(g))}</button>`).join('')}
+    </div>
+    <div class="row wrap drang-knoepfe">
+      <button type="button" class="ghost klein" data-act="drang-gestern">Wie gestern</button>
+      <button type="button" class="ghost klein" data-act="drang-nichts">Nichts davon heute</button>
+      <span class="meta">Neue Dränge: Mehr → Karte anpassen</span>
+    </div>
+    ${dg.map(([g, fs]) => gruppeHtml(g, fs, { versteckt: !offen.has(g) })).join('')}
+  </section>`;
+}
+
+/** Kachel an/aus: Bereich zeigen oder verbergen (Werte bleiben) */
+function drangZeigen(g, an) {
+  const offen = state.drangOffen.set;
+  if (an) offen.add(g); else offen.delete(g);
+  const box = $main.querySelector(`#draenge details[data-gruppe="${CSS.escape(g)}"]`);
+  if (box) { box.hidden = !an; if (an) box.open = true; }
+  const k = $main.querySelector(`[data-act="drang-kachel"][data-g="${CSS.escape(g)}"]`);
+  if (k) { k.classList.toggle('on', an); k.setAttribute('aria-pressed', an); }
 }
 
 /** Fortschritt pro Bereich: „3/6“ ausgefüllt */
@@ -663,6 +730,7 @@ function fieldInput(f) {
           <output class="stepwert ${hasValue(v) ? '' : 'offen'}">${hasValue(v) ? v : 'Offen'}</output>
           <button type="button" tabindex="-1" aria-hidden="true" data-act="step" data-field="${f.id}" data-delta="1">+</button>
         </div></div>
+      ${stufenVon(f) ? `<span class="skalentext" aria-live="polite">${esc(stufenText(f, v))}</span>` : ''}
       ${steps <= 10
         ? `<div class="segmente" aria-hidden="true">${opts.map((o) => `<button type="button" tabindex="-1" class="seg ${hasValue(v) && o <= v ? 'an' : ''}" data-act="seg" data-field="${f.id}" data-value="${o}" title="${o}"></button>`).join('')}</div>`
         : `<input type="range" data-field="${f.id}" data-kind="number" min="${f.min}" max="${f.max}" step="${f.step}" value="${hasValue(v) ? v : f.min}" class="${hasValue(v) ? '' : 'unset'}" aria-label="${esc(f.name)}">`}
@@ -673,6 +741,15 @@ function fieldInput(f) {
       <button type="button" data-act="set" data-field="${f.id}" data-value="true" class="${v === true ? 'on' : ''}">Ja</button>
       <button type="button" data-act="set" data-field="${f.id}" data-value="false" class="${v === false ? 'on' : ''}">Nein</button>
       ${clear}</div></div>`;
+  }
+  if (istMinuten(f)) {
+    const w = state.config.einheitWahl?.[f.id] ?? 'min';
+    const faktor = ZEIT_EINHEITEN[w]?.[1] ?? 1;
+    const anzeige = hasValue(v) ? +(v / faktor).toFixed(2) : '';
+    return `<div class="field">${label}<span class="mitEinheit">
+      <input type="number" inputmode="decimal" min="0" step="any" data-field="${f.id}" data-kind="number" data-faktor="${faktor}" value="${anzeige}" aria-label="${esc(f.name)}">
+      <select data-einheitwahl="${f.id}" aria-label="Einheit">${Object.entries(ZEIT_EINHEITEN).map(([k, [n]]) => `<option value="${k}" ${k === w ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      </span>${hasValue(v) && faktor !== 1 ? `<span class="hint">= ${dauerText(v)}</span>` : ''}</div>`;
   }
   if (f.type === 'number') {
     return `<label class="field">${label}<span class="mitEinheit"><input type="number" inputmode="decimal" min="0" data-field="${f.id}" data-kind="number" step="${f.step || 'any'}" value="${hasValue(v) ? v : ''}">${f.unit ? `<span class="einheit">${esc(f.unit)}</span>` : ''}</span></label>`;
@@ -708,6 +785,8 @@ function updStepper(id) {
   if (hasValue(v)) sb.setAttribute('aria-valuenow', v); else sb.removeAttribute('aria-valuenow');
   sb.setAttribute('aria-valuetext', hasValue(v) ? `${v} von ${sb.getAttribute('aria-valuemax')}` : 'offen, noch kein Wert');
   box.querySelectorAll('.seg').forEach((s) => s.classList.toggle('an', hasValue(v) && +s.dataset.value <= v));
+  const st = box.querySelector('.skalentext');
+  if (st) st.textContent = stufenText(state.config.fields.find((x) => x.id === id), v);
   const r = box.querySelector('input[type=range]');
   if (r) { r.value = hasValue(v) ? v : r.min; r.classList.toggle('unset', !hasValue(v)); }
 }
@@ -728,22 +807,35 @@ function refreshMeds(fid, focusLast = false) {
   if (focusLast) box.querySelector('.medrow:last-child [data-med="name"]')?.focus();
 }
 
+function skillKachel(s) {
+  const an = !!state.entry.skills[s.id]?.used;
+  return `<button type="button" class="${an ? 'on' : ''}" data-act="skill-kachel" data-skill-id="${s.id}" aria-pressed="${an}">${esc(s.name)}</button>`;
+}
+
+/** Wirkung je genutztem Skill: 6 runde Knöpfe mit Wort */
+function wirkungenHtml() {
+  const genutzt = state.config.skills.filter((s) => state.entry.skills[s.id]?.used);
+  if (!genutzt.length) return '';
+  return `<p class="fname">Wie gut hat es geholfen?</p>${genutzt.map((s) => {
+    const r = state.entry.skills[s.id].rating;
+    return `<div class="wirkung-zeile"><span class="wirkung-name">${esc(s.name)}</span>
+      <span class="wirkung-knoepfe" role="group" aria-label="Wirkung ${esc(s.name)}">${[0, 1, 2, 3, 4, 5].map((n) => `<button type="button" data-act="skill-wirkung" data-skill-id="${s.id}" data-wert="${n}" class="${r === n ? 'on' : ''}" aria-pressed="${r === n}" title="${STUFEN_WIRKUNG[n]}">${n}</button>`).join('')}</span>
+      <span class="skalentext">${hasValue(r) ? STUFEN_WIRKUNG[r] : ''}</span></div>`;
+  }).join('')}`;
+}
+
 function skillsBlock(stored) {
   const usedIds = new Set(Object.keys(stored?.skills ?? {}));
   const skills = state.config.skills.filter((s) => !s.hidden || usedIds.has(s.id));
   if (!skills.length) return '<p class="meta">Noch keine Skills. Unter „Mehr → Skills“ anlegen.</p>';
-  return groupBy(skills, (s) => s.module).map(([mod, list]) => `
-    <details class="modul-${mod}" ${list.some((s) => usedIds.has(s.id)) ? 'open' : ''}><summary>${esc(MODULE[mod] ?? mod)}</summary>
-      ${list.map((s) => {
-        const u = state.entry.skills[s.id];
-        return `<div class="skill">
-          <label><input type="checkbox" data-skill="${s.id}" ${u?.used ? 'checked' : ''}> ${esc(s.name)}</label>
-          <select data-skill-rating="${s.id}" ${u?.used ? '' : 'disabled'} title="Wie gut hat es geholfen?">
-            <option value="">Wirkung</option>
-            ${[0, 1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${u?.rating === n ? 'selected' : ''}>${n}</option>`).join('')}
-          </select></div>`;
-      }).join('')}
-    </details>`).join('');
+  const zuletzt = (state.skillsZuletzt ?? []).map((id) => skills.find((s) => s.id === id)).filter(Boolean);
+  return `<p class="hint">Tippe an, welche Skills du heute genutzt hast.</p>
+    ${zuletzt.length ? `<div class="field"><span class="fname">Zuletzt genutzt</span><div class="chips skill-chips">${zuletzt.map(skillKachel).join('')}</div></div>` : ''}
+    ${groupBy(skills, (s) => s.module).map(([mod, list]) => `
+    <details class="modul-${mod} skill-modul" ${list.some((s) => usedIds.has(s.id)) ? 'open' : ''}><summary>${esc(MODULE[mod] ?? mod)}</summary>
+      <div class="chips skill-chips">${list.map(skillKachel).join('')}</div>
+    </details>`).join('')}
+    <div id="wirkungen" class="wirkungen">${wirkungenHtml()}</div>`;
 }
 
 function updateSkillCount() {
@@ -793,6 +885,7 @@ async function renderVerlauf() {
     if (f.type === 'yesno') return `<td class="${v ? 'ja' : 'nein'}${gs}">${v ? 'Ja' : 'Nein'}</td>`;
     if (f.type === 'meds') v = v.map((m) => `${m.name} ${m.dose ?? ''}${m.unit ?? ''}`.trim()).join(', ');
     if (f.type === 'auswahl') v = [].concat(v).join(', ');
+    if (istMinuten(f)) return `<td class="${gs}">${dauerText(v)}</td>`;
     if (f.type === 'number') return `<td class="${gs}">${String(v).replace('.', ',')}${f.unit ? ` <small>${esc(f.unit)}</small>` : ''}</td>`;
     if (f.type === 'text' || f.type === 'meds' || f.type === 'auswahl') return `<td class="text${gs}" title="${esc(v)}">${esc(String(v).slice(0, 30))}${String(v).length > 30 ? '…' : ''}</td>`;
     if (f.type === 'scale') {
@@ -831,7 +924,7 @@ function renderMehr() {
     <span class="tagbadge">${icon(ic)}</span><span class="li-text"><b>${titel}</b><small>${text}</small></span><span class="pfeil">${icon('rechts')}</span></button>`;
   $main.innerHTML = `
     ${punkt('verlauf', 'verlauf', 'Verlauf', 'Alle Tage als Tabelle, Werte farblich nach Stärke')}
-    ${punkt('vorlage', 'vorlage', 'Vorlage der Diary-Card', `Felder, Skalen, Bausteine, Kurzansicht · Version v${currentVersion(state.config).v}`)}
+    ${punkt('vorlage', 'vorlage', 'Karte anpassen', `Was auf deiner Karte steht: Dränge, Felder, Kurzansicht · Version v${currentVersion(state.config).v}`)}
     ${punkt('skills', 'skills', 'Skills', 'DBT-Skills sammeln, eigene anlegen, ausblenden')}
     ${punkt('daten', 'einstellungen', 'Einstellungen &amp; Daten', `Aussehen (hell/dunkel, Farben), Therapietag (${WOCHENTAGE[E().wochenstart]}), PIN-Sperre ${E().pin ? 'an' : 'aus'}, Tonfall, Erinnerung, Notfallkontakte, Sicherung`)}
     ${punkt('datenschutz', 'schloss', 'Datenschutz', 'Was gespeichert wird, wo es liegt und wie du alles löschst')}
@@ -868,9 +961,13 @@ function renderDatenschutz() {
       <h3>Sicherung und Weitergabe</h3>
       <p>Nur wenn <em>du</em> exportierst oder einen Bericht teilst, entsteht eine Datei. Sie ist <strong>nicht verschlüsselt</strong>.
       Bewahre sie sicher auf und schicke sie möglichst nicht über Messenger, E-Mail oder Cloud. Was du mit der Datei machst, entscheidest du.</p>
+      <p>Beim Drucken oder „Als PDF speichern“ verarbeitet der Druckdienst deines Geräts den Bericht. Wählst du beim Teilen eine andere App
+      (z. B. Messenger, Cloud), gelten deren Regeln. Auch deine Tastatur-App sieht, was du tippst – nutze möglichst eine ohne Online-Funktionen.</p>
 
       <h3>Schutz vor neugierigen Blicken</h3>
-      <p>Die PIN-Sperre schützt die Anzeige, verschlüsselt die Daten aber nicht. ${istNativ() ? 'Mit „Inhalt schützen“ (Einstellungen) ist der Inhalt in der App-Übersicht verborgen und Bildschirmfotos sind gesperrt.' : 'Schütze dein Gerät zusätzlich mit einer Bildschirmsperre.'}</p>
+      <p>Die PIN-Sperre schützt die Anzeige, verschlüsselt die Daten aber nicht. Wer dein Handy in der Hand hat, kann die PIN über „PIN vergessen?“ entfernen
+      (damit du nie ausgesperrt bist) – sie hält also neugierige Blicke ab, ist aber kein Schutz vor jemandem, der gezielt sucht.
+      Auf dem Sperrbildschirm ist die Krisenhilfe immer erreichbar; ob dort auch deine Kontakte und dein Notfallplan erscheinen, stellst du bei der PIN-Sperre ein. ${istNativ() ? 'Mit „Inhalt schützen“ (Einstellungen) ist der Inhalt in der App-Übersicht verborgen und Bildschirmfotos sind gesperrt.' : 'Schütze dein Gerät zusätzlich mit einer Bildschirmsperre.'}</p>
 
       <h3>Alles löschen</h3>
       <p>${loeschen} Vorher exportieren, wenn du die Daten behalten möchtest – sie sind sonst endgültig weg.</p>
@@ -886,8 +983,8 @@ const istVerhaltenGruppe = (g = '') => /^(Verhalten|Problemverhalten|Neue Wege):
 
 function verhaltenBaukasten() {
   const vb = (state.vb ??= { vorlage: 'bildschirm', arten: new Set(VERHALTEN_VORLAGEN.bildschirm.arten), name: '', einheit: '' });
-  return `<div class="karte baukasten kat-problem">
-    <h2>Verhalten hinzufügen</h2>
+  return `<details class="karte baukasten kat-problem" ${vb.name ? 'open' : ''}>
+    <summary><b>${icon('plus', 18)} Neuen Drang oder neues Verhalten hinzufügen</b></summary>
     <p class="meta">Für Süchte, alte Gewohnheiten, Hobbys oder neue Wege: Wähle, <b>was</b> du daran beobachten möchtest. Später jederzeit änderbar.</p>
     <label class="field"><span class="fname">Name</span>
       <input id="vb-name" value="${esc(vb.name)}" placeholder="z. B. Gaming, Kaufen, Grübeln, Nein sagen"></label>
@@ -900,8 +997,8 @@ function verhaltenBaukasten() {
           <span>${esc(m.titel)}<small>${esc(m.info)}</small></span></label>`).join('')}</div>
       <label class="einheit-zeile" ${vb.arten.has('viel') ? '' : 'hidden'}>Einheit für „Wie viel“ <input id="vb-einheit" value="${esc(vb.einheit)}" placeholder="z. B. Gläser, €, Stück" class="kurz"></label>
     </div>
-    <div class="actions"><button class="primary" data-act="vb-add">${icon('plus', 18)} Verhalten hinzufügen</button></div>
-  </div>`;
+    <div class="actions"><button class="primary" data-act="vb-add">${icon('plus', 18)} Hinzufügen</button></div>
+  </details>`;
 }
 
 /** Welche Messarten hat ein Bereich schon? Und mit welchem ID-Präfix? */
@@ -939,7 +1036,7 @@ function zeigeMessartWahl(gruppe) {
     if (!arten.length) return;
     const neu = eindeutig(Object.keys(MESSARTEN).filter((k) => arten.includes(k)).map((k) => MESSARTEN[k].feld(praefix, gruppe, { einheit })));
     einfuegen(neu);
-    toast(`${neu.length} Messart${neu.length > 1 ? 'en' : ''} ergänzt – jetzt „Vorlage speichern“`);
+    toast(`${neu.length} Messart${neu.length > 1 ? 'en' : ''} ergänzt – jetzt „Speichern“`);
   };
 }
 
@@ -949,11 +1046,22 @@ function renderVorlage() {
   const bereiche = [...new Set(state.draftFields.map((f) => f.group).filter(Boolean))];
   const geaendert = templateChanged(c, state.draftFields);
 
+  const offen = (state.vorlageOffen ??= new Set());
   $main.innerHTML = `
-    <p class="meta">Aktuelle Vorlage: <strong>v${currentVersion(c).v}</strong>. Speichern legt eine neue Version an – alte Einträge bleiben unverändert.
-    Gespeicherte Felder kann man umbenennen und ausblenden, aber nicht löschen.</p>
+    <div class="karte vorlage-kopf">
+      <h2>Karte anpassen</h2>
+      <p>Hier legst du fest, was auf deiner Tageskarte steht. <strong>Nichts geht verloren:</strong> Ausgeblendete Punkte verschwinden nur von der Karte,
+      alte Einträge bleiben vollständig. Änderungen gelten erst nach „Speichern“.</p>
+      <p class="fname">Schnell starten</p>
+      <div class="vorlage-presets">
+        <button type="button" data-act="tpl-preset" data-wert="einfach"><b>Einfach</b><small>6 Befinden-Werte, Dränge, Medikamente, Notizen, Skills</small></button>
+        <button type="button" data-act="tpl-preset" data-wert="standard"><b>Standard</b><small>wie die Papier-Diary-Card</small></button>
+        <button type="button" data-act="tpl-preset" data-wert="alles"><b>Ausführlich</b><small>alles zeigen, auch Ausgeblendetes</small></button>
+      </div>
+    </div>
     <datalist id="bereiche">${bereiche.map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
-    ${verhaltenBaukasten()}
+    <h3 class="vorlage-h">Schon auf deiner Karte</h3>
+    <p class="meta">Antippen zum Bearbeiten. ✓ = auf der Karte sichtbar.</p>
     <details class="karte einzelfeld">
       <summary><b>Einzelnes Feld hinzufügen</b> <span class="meta">– z. B. eine Skala oder ein Ja/Nein</span></summary>
       <div class="row wrap">
@@ -963,26 +1071,29 @@ function renderVorlage() {
       </div>
       <p class="meta" id="bausteininfo">${esc(BAUSTEINE.menge.info)}</p>
     </details>
-    ${groupBy(state.draftFields.map((f, i) => ({ f, i })), (x) => x.f.group || 'Allgemein').map(([g, items]) => `
-      <section class="bereich">
+    ${groupBy(state.draftFields.map((f, i) => ({ f, i })), (x) => x.f.group || 'Allgemein').map(([g, items]) => {
+      const an = items.filter((x) => !x.f.hidden).length;
+      return `
+      <details class="bereich kat-${kategorie(g)}" data-bereich="${esc(g)}" ${offen.has(g) ? 'open' : ''}>
+        <summary class="bereich-zeile"><span class="kat-punkt" aria-hidden="true"></span><b>${esc(g)}</b>
+          <span class="meta">${an ? `✓ ${an} von ${items.length} sichtbar` : 'ausgeblendet'}</span>${icon('runter', 18)}</summary>
         <div class="row bereichkopf">
           <input class="bereichname" data-g="${esc(g)}" value="${esc(g)}" aria-label="Bereich umbenennen" title="Bereich umbenennen (gilt für alle Felder darin)">
           ${istVerhaltenGruppe(g) ? `<button data-act="v-messart" data-group="${esc(g)}" class="ghost">+ Messart</button>` : ''}
           <button data-act="f-add" data-group="${esc(g)}" class="ghost">+ Feld</button>
         </div>
         ${items.map(({ f, i }, k) => feldEditor(f, i, k === 0, k === items.length - 1)).join('')}
-      </section>`).join('')}
+      </details>`;
+    }).join('')}
+    ${verhaltenBaukasten()}
     <div class="actions sticky">
-      <button data-act="tpl-save" class="primary" ${geaendert ? '' : 'disabled'}>Vorlage speichern</button>
+      <button data-act="tpl-save" class="primary" ${geaendert ? '' : 'disabled'}>Speichern</button>
       <button data-act="tpl-reset" class="ghost" ${geaendert ? '' : 'disabled'}>Verwerfen</button>
     </div>
     <details class="versionen"><summary>Versionen (${c.versions.length})</summary>
       <ul>${[...c.versions].reverse().map((v) => `<li>v${v.v} · ${fmtTime(v.savedAt)} · ${v.fields.filter((f) => !f.hidden).length} sichtbare Felder</li>`).join('')}</ul>
     </details>
-    <details class="versionen"><summary>Weitere Aktionen</summary>
-      <p><button data-act="tpl-standard">Diary-Card-Standard übernehmen</button></p>
-      <p class="meta">Zeigt die Standardfelder der Papier-Diary-Card, blendet alle anderen aus. Nichts wird gelöscht, alte Einträge bleiben. Danach noch „Vorlage speichern“.</p>
-    </details>`;
+    <p class="meta">Stand: Version ${currentVersion(c).v}. Jedes Speichern legt eine neue Version an; frühere Karten behalten ihre Felder.</p>`;
 }
 
 function feldEditor(f, i, erstes, letztes) {
@@ -1032,6 +1143,7 @@ function einfuegen(felder) {
     while (pos > 0 && state.draftFields[pos - 1].hidden) pos -= 1;
   }
   state.draftFields.splice(pos, 0, ...felder);
+  (state.vorlageOffen ??= new Set()).add(g);
   renderVorlage();
   const input = $main.querySelector(`.feld[data-idx="${pos}"] .name`);
   input?.scrollIntoView({ block: 'center' });
@@ -1161,9 +1273,10 @@ document.getElementById('druck').addEventListener('click', (e) => {
 });
 
 // ---------- Notfall & Hinweis ----------
-function zeigeNotfall() {
-  const notSkills = state.config.skills.filter((s) => s.notfall && !s.hidden);
-  const kontakte = E().notfallKontakte ?? [];
+function zeigeNotfall({ gesperrt = false } = {}) {
+  const privat = !gesperrt || E().sperreKontakte !== false;
+  const notSkills = privat ? state.config.skills.filter((s) => s.notfall && !s.hidden) : [];
+  const kontakte = privat ? E().notfallKontakte ?? [] : [];
   openModal(`
     <h2>♥ Hilfe in der Krise</h2>
     <p>Wenn du in Gefahr bist oder daran denkst, dir etwas anzutun: <strong>Ruf jetzt an.</strong></p>
@@ -1178,7 +1291,7 @@ function zeigeNotfall() {
       <a href="tel:08001110222"><b>0800 111 0 222</b><small>Telefonseelsorge – zweite Leitung</small></a>
       <a href="tel:116117"><b>116 117</b><small>Ärztlicher Bereitschaftsdienst</small></a>
     </div>
-    ${E().notfallPlan ? `<h3>Mein Notfallplan</h3><div class="notfallplan">${esc(E().notfallPlan).replace(/\n/g, '<br>')}</div>` : ''}
+    ${privat && E().notfallPlan ? `<h3>Mein Notfallplan</h3><div class="notfallplan">${esc(E().notfallPlan).replace(/\n/g, '<br>')}</div>` : ''}
     <h3>Skill jetzt üben</h3>
     ${uebungenListe().replace('class="uebungen-liste"', 'class="uebungen-liste kompakt"')}
     ${notSkills.length ? `<h3>Meine Notfall-Skills</h3><ul class="notfallskills">${notSkills.map((s) => `<li><b>${esc(s.name)}</b>${s.description ? ` – ${esc(s.description)}` : ''}</li>`).join('')}</ul>` : ''}
@@ -1310,7 +1423,11 @@ async function renderDaten() {
     <div class="karte">
       <h2>PIN-Sperre</h2>
       <p class="meta">Fragt beim Öffnen und nach 1 Minute im Hintergrund nach einer PIN (4–8 Ziffern).
-      Schützt vor neugierigen Blicken – die Daten selbst sind <strong>nicht verschlüsselt</strong>.</p>
+      Schützt vor neugierigen Blicken – die Daten selbst sind <strong>nicht verschlüsselt</strong>.
+      Über „PIN vergessen?“ lässt sie sich ohne PIN entfernen, damit du nie ausgesperrt bist.</p>
+      <label class="check"><input type="checkbox" id="sperre-kontakte" ${E().sperreKontakte !== false ? 'checked' : ''}>
+        Auf dem Sperrbildschirm unter „Hilfe in der Krise“ auch meine Kontakte und meinen Notfallplan zeigen</label>
+      <p class="meta">Aus: Dort erscheinen nur 112, Telefonseelsorge und die Übungen.</p>
       <p>Status: <strong>${E().pin ? 'an' : 'aus'}</strong></p>
       <form id="pin-form" class="row wrap" autocomplete="off">
         ${E().pin ? '<label>Aktuelle PIN <input type="password" inputmode="numeric" name="alt" maxlength="8" class="kurz"></label>' : ''}
@@ -1421,6 +1538,47 @@ $main.addEventListener('click', async (e) => {
   if (act === 'info') return zeigeInfo(el.dataset.field, infoKnoepfeAktualisieren);
   if (act === 'f-info') return zeigeInfo(state.draftFields[+el.closest('.feld').dataset.idx].id, infoKnoepfeAktualisieren);
   if (act === 'step') return schritt(el.dataset.field, +el.dataset.delta);
+  if (act === 'drang-kachel') {
+    const g = el.dataset.g;
+    const an = !state.drangOffen.set.has(g);
+    const fs = (state.kartenFelder ?? state.config.fields).filter((f) => (f.group || 'Allgemein') === g);
+    if (!an && gruppeHatWerte(fs)) return toast('Hier ist schon etwas eingetragen – der Bereich bleibt sichtbar');
+    return drangZeigen(g, an);
+  }
+  if (act === 'drang-nichts') {
+    let behalten = 0;
+    [...state.drangOffen.set].forEach((g) => {
+      if (gruppeHatWerte((state.kartenFelder ?? state.config.fields).filter((f) => (f.group || 'Allgemein') === g))) behalten += 1;
+      else drangZeigen(g, false);
+    });
+    return toast(behalten ? 'Bereiche mit Einträgen bleiben sichtbar' : 'Okay – heute keine Dränge');
+  }
+  if (act === 'drang-gestern') {
+    const gestern = await db.getEntry(shiftDate(state.date, -1));
+    const gs = [...new Set(state.config.fields.filter((f) => kategorie(f.group ?? '') === 'problem' && hasValue(gestern?.values?.[f.id])).map((f) => f.group))];
+    if (!gs.length) return toast('Gestern war hier nichts eingetragen');
+    gs.forEach((g) => drangZeigen(g, true));
+    return toast(`Wie gestern: ${gs.map(drangName).join(', ')} – Stärke bitte neu wählen`);
+  }
+  if (act === 'skill-kachel') {
+    const id = el.dataset.skillId;
+    const s = (state.entry.skills[id] ??= { used: false, rating: null });
+    s.used = !s.used;
+    $main.querySelectorAll(`[data-act="skill-kachel"][data-skill-id="${id}"]`).forEach((b) => { b.classList.toggle('on', s.used); b.setAttribute('aria-pressed', s.used); });
+    const wk = $main.querySelector('#wirkungen');
+    if (wk) wk.innerHTML = wirkungenHtml();
+    autoSpeichern();
+    return updateSkillCount();
+  }
+  if (act === 'skill-wirkung') {
+    const s = state.entry.skills[el.dataset.skillId];
+    if (!s) return;
+    const w = +el.dataset.wert;
+    s.rating = s.rating === w ? null : w;
+    const wk = $main.querySelector('#wirkungen');
+    if (wk) wk.innerHTML = wirkungenHtml();
+    return autoSpeichern();
+  }
   if (act === 'seg') return schritt(el.dataset.field, 0, +el.dataset.value);
   if (act === 'wahl') {
     const id = el.dataset.field;
@@ -1505,10 +1663,19 @@ $main.addEventListener('click', async (e) => {
     const name = $main.querySelector('#vb-name').value.trim();
     if (!name) { $main.querySelector('#vb-name').focus(); return toast('Bitte einen Namen eingeben, z. B. „Gaming“'); }
     if (!vb.arten.size) return toast('Bitte mindestens eine Messart ankreuzen');
+    const klein = (x) => x.toLowerCase().replace(/[^a-zäöüß0-9]/g, '');
+    const aehnlich = [...new Set(state.draftFields.map((f) => f.group ?? ''))].filter((g) => {
+      const a = klein(g.replace(/^(Problemverhalten|Verhalten|Neue Wege):\s*/, '')); const b = klein(name);
+      return a && b && (a.includes(b) || b.includes(a));
+    });
+    if (aehnlich.length && !(await frage(`Es gibt schon: ${aehnlich.join(', ')}. Trotzdem „${name}“ neu anlegen?`, { titel: 'Schon vorhanden?', ja: 'Trotzdem anlegen', nein: 'Abbrechen' }))) {
+      aehnlich.forEach((g) => (state.vorlageOffen ??= new Set()).add(g));
+      return renderVorlage();
+    }
     const felder = eindeutig(verhaltenFelder(name, newId('f'), [...vb.arten], { vorlage: vb.vorlage, einheit: vb.einheit }));
     state.vb = { ...vb, name: '', einheit: '' };
     einfuegen(felder);
-    return toast(`„${name}“ mit ${felder.length} Messarten angelegt – jetzt „Vorlage speichern“`);
+    return toast(`„${name}“ mit ${felder.length} Messarten angelegt – jetzt „Speichern“`);
   }
   if (act === 'v-messart') return zeigeMessartWahl(el.dataset.group);
   if (act === 'b-add') {
@@ -1516,12 +1683,20 @@ $main.addEventListener('click', async (e) => {
     if (!name) { $main.querySelector('#bausteinname').focus(); return toast('Bitte einen Namen eingeben'); }
     return einfuegen(BAUSTEINE[$main.querySelector('#baustein').value].felder(name, newId('f')));
   }
-  if (act === 'tpl-standard') {
-    if (!(await frage('Andere Felder werden ausgeblendet, nicht gelöscht. Alte Einträge bleiben erhalten.', { titel: 'Standard-Diary-Card übernehmen?', ja: 'Übernehmen' }))) return;
-    state.draftFields = applyStandard(state.draftFields);
+  if (act === 'tpl-preset') {
+    const art = el.dataset.wert;
+    const neu = art === 'standard' ? applyStandard(state.draftFields)
+      : state.draftFields.map((f) => ({ ...f, hidden: art === 'alles' ? false : !BEFINDEN_IDS.includes(f.id) && !['text', 'meds'].includes(f.type) && kategorie(f.group ?? '') !== 'problem' }));
+    const vorher = new Set(state.draftFields.filter((f) => !f.hidden).map((f) => f.id));
+    const sichtbar = neu.filter((f) => !f.hidden);
+    const aus = state.draftFields.filter((f) => vorher.has(f.id) && neu.find((n) => n.id === f.id)?.hidden).length;
+    const titel = { einfach: 'Einfach', standard: 'Standard', alles: 'Ausführlich' }[art];
+    if (!(await frage(`Danach stehen ${sichtbar.length} Punkte auf deiner Karte.${aus ? ` ${aus} werden ausgeblendet – nicht gelöscht, alte Einträge bleiben.` : ''} Danach noch „Speichern“.`, { titel: `„${titel}“ übernehmen?`, ja: 'Übernehmen' }))) return;
+    state.draftFields = neu;
     renderVorlage();
-    return toast('Übernommen – jetzt „Vorlage speichern“');
+    return toast('Übernommen – jetzt „Speichern“');
   }
+
   if (act === 'f-move') {
     const g = state.draftFields[idx].group;
     const d = +el.dataset.delta;
@@ -1636,6 +1811,11 @@ $main.addEventListener('keydown', (e) => {
 
 // Auf-/Zuklappen der Bereiche merken (toggle blubbert nicht → capture)
 $main.addEventListener('toggle', (e) => {
+  if (e.target.matches?.('details.bereich[data-bereich]')) {
+    state.vorlageOffen ??= new Set();
+    if (e.target.open) state.vorlageOffen.add(e.target.dataset.bereich); else state.vorlageOffen.delete(e.target.dataset.bereich);
+    return;
+  }
   const g = e.target.dataset?.gruppe;
   if (!g) return;
   state.zu ??= new Set();
@@ -1676,7 +1856,9 @@ $main.addEventListener('input', (e) => {
   if (t.dataset.field) {
     const id = t.dataset.field;
     if (t.dataset.kind === 'number') {
-      setValue(id, t.value === '' ? null : Number(t.value));
+      const faktor = Number(t.dataset.faktor || 0);
+      // Dauer: immer ganze Minuten speichern, egal ob Minuten, Stunden oder Tage eingegeben werden
+      setValue(id, t.value === '' ? null : faktor ? Math.round(Number(t.value) * faktor) : Number(t.value));
       if (t.type === 'range') updStepper(id);
     } else setValue(id, t.value);
     return;
@@ -1697,6 +1879,14 @@ $main.addEventListener('input', (e) => {
 
 $main.addEventListener('change', async (e) => {
   const t = e.target;
+  if (t.dataset.einheitwahl) {
+    state.config.einheitWahl = { ...state.config.einheitWahl, [t.dataset.einheitwahl]: t.value };
+    await saveConfig();
+    const box = t.closest('.field');
+    const f = state.config.fields.find((x) => x.id === t.dataset.einheitwahl);
+    box.outerHTML = fieldInput(f);
+    return;
+  }
   if (t.id === 'kurzansicht') {
     await autoSpeichernJetzt();
     E().kurzansicht = t.checked;
@@ -1728,6 +1918,11 @@ $main.addEventListener('change', async (e) => {
     await saveConfig();
     await bildschirmSchutz(t.checked);
     return toast(t.checked ? 'Inhalt geschützt – keine Bildschirmfotos' : 'Schutz aus – Bildschirmfotos möglich');
+  }
+  if (t.id === 'sperre-kontakte') {
+    E().sperreKontakte = t.checked;
+    await saveConfig();
+    return toast(t.checked ? 'Kontakte auf dem Sperrbildschirm sichtbar' : 'Sperrbildschirm zeigt nur allgemeine Hilfe');
   }
   if (t.id === 'sanfter-hinweis') {
     E().sanfterHinweis = t.checked;
@@ -1766,28 +1961,7 @@ $main.addEventListener('change', async (e) => {
     }
     return;
   }
-  if (t.dataset.skill) {
-    const id = t.dataset.skill;
-    const s = (state.entry.skills[id] ??= { used: false, rating: null });
-    s.used = t.checked;
-    const sel = $main.querySelector(`[data-skill-rating="${id}"]`);
-    sel.disabled = !t.checked;
-    autoSpeichern();
-    return updateSkillCount();
-  }
-  if (t.dataset.skillRating) {
-    const id = t.dataset.skillRating;
-    const s = (state.entry.skills[id] ??= { used: false, rating: null });
-    s.rating = t.value === '' ? null : Number(t.value);
-    if (s.rating !== null && !s.used) {
-      s.used = true;
-      const cb = $main.querySelector(`[data-skill="${id}"]`);
-      if (cb) cb.checked = true;
-      updateSkillCount();
-    }
-    autoSpeichern();
-    return;
-  }
+
   if (t.classList.contains('bereichname')) {
     const alt = t.dataset.g;
     const neu = t.value.trim();
@@ -1870,7 +2044,7 @@ $main.addEventListener('submit', async (e) => {
 // ---------- Sperre ----------
 async function entsperren() {
   if (!E().pin) return;
-  await sperren(E().pin, async () => { E().pin = null; await saveConfig(); toast('PIN entfernt'); }, () => zeigeNotfall());
+  await sperren(E().pin, async () => { E().pin = null; await saveConfig(); toast('PIN entfernt'); }, () => zeigeNotfall({ gesperrt: true }));
 }
 
 let verstecktSeit = null;

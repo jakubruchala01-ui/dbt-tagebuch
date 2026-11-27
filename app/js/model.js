@@ -52,6 +52,19 @@ export function commitTemplate(c, fields) {
 /** Wurde das Feld schon einmal gespeichert? Dann darf es nicht mehr entfernt oder im Typ geändert werden. */
 export const isCommitted = (c, id) => c.versions.some((v) => v.fields.some((f) => f.id === id));
 
+/** Zahl-Feld, das eine Dauer in Minuten speichert („Wie lange“) */
+export const istMinuten = (f) => f?.type === 'number' && f.unit === 'Minuten';
+/** Minuten lesbar: „45 min“, „7 h“, „7 h 30 min“ */
+export function dauerText(min) {
+  const m = Math.round(Number(min));
+  if (!Number.isFinite(m) || m < 0) return '';
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+}
+/** Anzeige-Einheiten für Dauern: Faktor in Minuten */
+export const ZEIT_EINHEITEN = { min: ['Minuten', 1], h: ['Stunden', 60], t: ['Tage', 1440] };
+
 export const hasValue = (v) => (Array.isArray(v) ? v.length > 0 : v !== undefined && v !== null && v !== '');
 
 /** Medikamente aus einem Eintrag in die gespeicherte Liste übernehmen (Name → letzte Dosis/Einheit). */

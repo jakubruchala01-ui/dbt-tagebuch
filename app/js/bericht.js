@@ -1,6 +1,6 @@
 // PDF-Bericht: druckfertige Diary-Card (A4 quer), eine Woche pro Blatt, optional Vorwochen-Vergleich und Verhaltensketten.
 // Wird als HTML erzeugt und über den Druckdialog des Browsers als PDF gespeichert.
-import { hasValue, shiftDate, currentVersion } from './model.js';
+import { hasValue, shiftDate, currentVersion, istMinuten, dauerText } from './model.js';
 import { MODULE, KAT_HELL, MODUL_HELL, kategorie } from './defaults.js';
 import { GLIED_ARTEN, ABSCHNITTE } from './ketten.js';
 
@@ -35,6 +35,7 @@ function zelle(f, v) {
     return `<td class="skala" style="--i:${(0.06 + i * 0.5).toFixed(2)}">${zahl(v)}</td>`;
   }
   if (f.type === 'yesno') return v ? '<td class="ja">Ja</td>' : '<td class="nein">Nein</td>';
+  if (istMinuten(f)) return `<td class="zahl">${dauerText(v)}</td>`;
   if (f.type === 'number') return `<td class="zahl">${zahl(v, 2)}${f.unit ? `<small> ${esc(f.unit)}</small>` : ''}</td>`;
   if (f.type === 'auswahl') return `<td class="meds">${[].concat(v).map((x) => `<div>${esc(x)}</div>`).join('')}</td>`;
   if (f.type === 'meds') return `<td class="meds">${v.map((m) => `<div>${esc(m.name)}${hasValue(m.dose) ? ` <small>${zahl(m.dose, 3)} ${esc(m.unit)}</small>` : ''}</div>`).join('')}</td>`;
@@ -46,6 +47,7 @@ function auswertung(f, werte, klasse = 'summe') {
   if (!w.length) return `<td class="${klasse} leer"></td>`;
   if (f.type === 'scale') return `<td class="${klasse}" title="Durchschnitt">Ø ${zahl(w.reduce((a, b) => a + b, 0) / w.length)}</td>`;
   if (f.type === 'yesno') return `<td class="${klasse}">${w.filter(Boolean).length}× Ja</td>`;
+  if (istMinuten(f)) return `<td class="${klasse}" title="Summe">Σ ${dauerText(w.reduce((a, b) => a + b, 0))}</td>`;
   if (f.type === 'number') return `<td class="${klasse}" title="Summe">Σ ${zahl(w.reduce((a, b) => a + b, 0), 2)}${f.unit ? `<small> ${esc(f.unit)}</small>` : ''}</td>`;
   if (f.type === 'meds') return `<td class="${klasse}">${w.length} Tage</td>`;
   if (f.type === 'auswahl') {

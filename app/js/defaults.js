@@ -91,7 +91,7 @@ export const MESSART_ENDUNG = {
 
 /** Startauswahlen: setzen nur die Häkchen vor – alles bleibt änderbar */
 export const VERHALTEN_VORLAGEN = {
-  bildschirm: { titel: 'Bildschirm / Gaming', arten: ['lange', 'gefuehlWaehrend', 'gefuehlDanach'] },
+  bildschirm: { titel: 'Bildschirm / Gaming', arten: ['drang', 'lange', 'gefuehlWaehrend', 'gefuehlDanach'] },
   essen: { titel: 'Essattacke', arten: ['drang', 'oft', 'wann', 'gefuehlDanach'] },
   substanz: { titel: 'Substanz', arten: ['drang', 'gemacht', 'viel', 'ausloeser'] },
   krise: { titel: 'Selbstverletzung / Krisenverhalten', arten: ['drang', 'gemacht', 'skillStatt'] },

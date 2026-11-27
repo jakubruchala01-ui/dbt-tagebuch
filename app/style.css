@@ -714,3 +714,44 @@ button.herz { min-height: 44px; min-width: 56px; padding: 8px 14px; justify-cont
 body.gesperrt #modal { z-index: 90; }
 .modal-box h2 { padding-right: 92px; }
 .sperr-vergessen[hidden], .sperrbox .fehler[hidden] { display: none; }
+.skalentext { display: block; text-align: right; font-size: .85rem; color: var(--leise); min-height: 1.2em; margin-top: 2px; }
+
+/* Dränge & Verhalten: Kacheln */
+.draenge-kasten { padding: 14px 16px; }
+.draenge-titel { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 1.05rem; }
+.drang-chips button, .skill-chips button { min-height: 44px; padding: 8px 16px; border-radius: 999px; }
+.drang-chips button.mitwert::after { content: " ✓"; }
+.drang-knoepfe { gap: 8px; align-items: center; margin: 8px 0 4px; }
+.drang-knoepfe .meta { font-size: .8rem; }
+.draenge-kasten > details.gruppe-k { margin: 10px 0 0; box-shadow: none; border: 1px solid var(--linie); }
+.draenge-kasten > details[hidden] { display: none; }
+/* Skills: Kacheln und Wirkung */
+.skill-modul summary { padding: 6px 0; font-weight: 600; cursor: pointer; }
+.skill-chips { flex-wrap: wrap; gap: 8px; margin: 6px 0 10px; }
+.wirkungen .fname { margin-top: 12px; }
+.wirkung-zeile { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--linie); }
+.wirkung-name { font-weight: 500; }
+.wirkung-knoepfe { display: flex; gap: 6px; }
+.wirkung-knoepfe button { width: 40px; height: 40px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+.wirkung-knoepfe button.on { background: var(--akzent); color: var(--akzent-text); border-color: var(--akzent); }
+.wirkung-zeile .skalentext { grid-column: 1 / -1; text-align: right; }
+@media (max-width: 420px) {
+  .wirkung-zeile { grid-template-columns: 1fr; }
+  .wirkung-knoepfe { justify-content: space-between; }
+}
+
+/* Karte anpassen (Vorlage) */
+.vorlage-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.vorlage-presets button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 12px 14px; border-radius: 14px; min-height: 64px; }
+.vorlage-presets small { font-weight: 400; color: var(--leise); font-size: .8rem; }
+.vorlage-h { margin: 18px 0 2px; }
+details.bereich { background: var(--karte); border: 1px solid var(--linie); border-radius: 14px; margin: 8px 0; padding: 0 12px; }
+details.bereich[open] { padding-bottom: 10px; }
+.bereich-zeile { display: flex; align-items: center; gap: 8px; min-height: 48px; cursor: pointer; list-style: none; }
+.bereich-zeile::-webkit-details-marker { display: none; }
+.bereich-zeile .meta { margin-left: auto; font-size: .8rem; }
+details.bereich[open] .bereich-zeile .ico { transform: rotate(180deg); }
+details.baukasten > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.feld .row { flex-wrap: wrap; }
+.feld input.name { min-width: 0; flex: 1 1 140px; }
+.bereichkopf { flex-wrap: wrap; gap: 6px; } .bereichkopf .bereichname { flex: 1 1 160px; min-width: 0; }

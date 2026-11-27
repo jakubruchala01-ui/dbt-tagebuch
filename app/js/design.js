@@ -2,10 +2,10 @@
 // Wird früh im <head> geladen, damit beim Start nichts aufblitzt.
 
 export const HELL = {
-  salbei: { name: 'Salbei', farben: ['#F4F2EC', '#2E3532', '#4F7A6A', '#A85A40'], meta: '#4F7A6A' },
-  bernstein: { name: 'Bernstein', farben: ['#F7F0E4', '#3A3129', '#A0612A', '#A04E3C'], meta: '#A0612A' },
-  nebelblau: { name: 'Nebelblau', farben: ['#EEF2F5', '#26323D', '#3F6A8A', '#A65A4C'], meta: '#3F6A8A' },
-  lavendel: { name: 'Lavendel', farben: ['#F3F1F6', '#2F2B38', '#6B5B95', '#A8566A'], meta: '#6B5B95' },
+  salbei: { name: 'Salbei', farben: ['#EAF3EE', '#F8F1E7', '#4F7A6A', '#A85A40'], meta: '#EAF3EE' },
+  bernstein: { name: 'Bernstein', farben: ['#F9EDE1', '#FBF5EC', '#A0612A', '#A04E3C'], meta: '#F9EDE1' },
+  nebelblau: { name: 'Nebelblau', farben: ['#E8F0F8', '#F1EDF7', '#3F6A8A', '#A65A4C'], meta: '#E8F0F8' },
+  lavendel: { name: 'Lavendel', farben: ['#EFEAF7', '#F9ECF1', '#6B5B95', '#A8566A'], meta: '#EFEAF7' },
 };
 
 export const NACHT = {
@@ -18,7 +18,7 @@ export const NACHT = {
 };
 
 export const MODI = { auto: 'Automatisch', hell: 'Hell', dunkel: 'Dunkel' };
-export const DESIGN_STANDARD = { modus: 'auto', thema: 'salbei', nacht: 'mint' };
+export const DESIGN_STANDARD = { modus: 'auto', thema: 'salbei', nacht: 'mint', ruhig: false };
 
 const systemDunkel = () => window.matchMedia?.('(prefers-color-scheme: dark)').matches;
 
@@ -29,6 +29,7 @@ export function wendeDesignAn(design = DESIGN_STANDARD) {
   html.dataset.thema = HELL[d.thema] ? d.thema : 'salbei';
   html.dataset.nacht = NACHT[d.nacht] ? d.nacht : 'mint';
   html.dataset.dunkel = dunkel ? '1' : '0';
+  html.dataset.ruhig = d.ruhig ? '1' : '0'; // ohne Verläufe und Bewegung
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dunkel ? '#1C1F22' : HELL[html.dataset.thema].meta);
   try { localStorage.setItem('dbt-design', JSON.stringify(d)); } catch { /* nur Komfort */ }
 }

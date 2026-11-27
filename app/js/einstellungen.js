@@ -93,6 +93,9 @@ export async function renderDaten() {
       <div class="themenwahl">${Object.entries(NACHT).map(([k, t]) => `
         <button type="button" data-act="design" data-key="nacht" data-wert="${k}" class="${d.nacht === k ? 'on' : ''}">
           <span class="farbpunkte"><span style="background:#1C1F22"></span><span style="background:#E4E1DA"></span><span style="background:${t.farbe}"></span></span>${t.name}</button>`).join('')}</div>
+      <h3 class="unterkopf">Ruhige Darstellung</h3>
+      <label class="check"><input type="checkbox" id="design-ruhig" ${d.ruhig ? 'checked' : ''}> Ohne Farbverläufe und Bewegung</label>
+      <p class="meta">Flache, ruhige Flächen – hilfreich, wenn Farben oder Bewegung gerade zu viel sind.</p>
     </div>
     <div class="karte">
       <h2>Sanfter Hinweis bei hohen Werten</h2>
@@ -281,6 +284,12 @@ $main.addEventListener('change', async (e) => {
     await saveConfig();
     await bildschirmSchutz(t.checked);
     return toast(t.checked ? 'Inhalt geschützt – keine Bildschirmfotos' : 'Schutz aus – Bildschirmfotos möglich');
+  }
+  if (t.id === 'design-ruhig') {
+    E().design = { ...E().design, ruhig: t.checked };
+    wendeDesignAn(E().design);
+    await saveConfig();
+    return toast(t.checked ? 'Ruhige Darstellung an' : 'Ruhige Darstellung aus');
   }
   if (t.id === 'sperre-kontakte') {
     E().sperreKontakte = t.checked;

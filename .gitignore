@@ -7,3 +7,4 @@ ios/
 *.aab
 # Eigene Sicherungen nie ins Repository
 dbt-tagebuch-*.json
+testberichte/

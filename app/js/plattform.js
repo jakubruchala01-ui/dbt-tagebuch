@@ -9,6 +9,10 @@ const plugin = (name) => cap()?.Plugins?.[name];
 // ---------- Dateien speichern / teilen ----------
 /** Speichert Text als Datei: im Browser als Download, in der App über das Teilen-Menü (z. B. „In Dateien speichern“). */
 export async function dateiSpeichern(name, text, mime = 'application/json') {
+  // Uhrzeit anhängen, damit mehrere Dateien am selben Tag sich nie gegenseitig überschreiben
+  const z = new Date();
+  const uhr = [z.getHours(), z.getMinutes(), z.getSeconds()].map((n) => String(n).padStart(2, '0')).join('');
+  name = name.replace(/(\.[a-z0-9]+)$/i, `-${uhr}$1`);
   if (istNativ() && plugin('Filesystem') && plugin('Share')) {
     const { uri } = await plugin('Filesystem').writeFile({ path: name, data: text, directory: 'CACHE', encoding: 'utf8' });
     await plugin('Share').share({ title: name, files: [uri], dialogTitle: 'Sicherung speichern' });

@@ -15,7 +15,12 @@ export async function dateiSpeichern(name, text, mime = 'application/json') {
   name = name.replace(/(\.[a-z0-9]+)$/i, `-${uhr}$1`);
   if (istNativ() && plugin('Filesystem') && plugin('Share')) {
     const { uri } = await plugin('Filesystem').writeFile({ path: name, data: text, directory: 'CACHE', encoding: 'utf8' });
-    await plugin('Share').share({ title: name, files: [uri], dialogTitle: 'Sicherung speichern' });
+    try {
+      await plugin('Share').share({ title: name, files: [uri], dialogTitle: 'Sicherung speichern' });
+    } finally {
+      // Kopie im App-Zwischenspeicher nicht liegen lassen (kurz warten, bis die Ziel-App sie gelesen hat)
+      setTimeout(() => plugin('Filesystem').deleteFile({ path: name, directory: 'CACHE' }).catch(() => {}), 60_000);
+    }
     return;
   }
   const url = URL.createObjectURL(new Blob([text], { type: mime }));
@@ -39,8 +44,8 @@ export const ABSTAENDE = [[0, 'nur einmal'], [60, 'stündlich'], [120, 'alle 2 S
 
 const TEXTE = {
   sanft: ['Magst du heute deine Karte ausfüllen? Ein paar Werte reichen schon.', 'Deine Karte wartet noch auf dich – ganz ohne Druck.'],
-  klar: ['Deine Diary Card für heute ist noch offen.', 'Noch offen: die Schnell-Karte dauert etwa 30 Sekunden.'],
-  direkt: ['Diary Card noch offen – jetzt kurz ausfüllen.', 'Immer noch offen. Jetzt 30 Sekunden für die Schnell-Karte.'],
+  klar: ['Deine Karte für heute ist noch offen.', 'Noch offen: die Schnell-Karte dauert etwa 30 Sekunden.'],
+  direkt: ['Karte noch offen – jetzt kurz ausfüllen.', 'Immer noch offen. Jetzt 30 Sekunden für die Schnell-Karte.'],
 };
 
 const zuMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
@@ -81,7 +86,7 @@ export async function erinnerungenPlanen(e, tonfall, heuteErledigt) {
       if (at <= jetzt) return;
       liste.push({
         id: 1000 + tag * 20 + i,
-        title: 'DBT-Tagebuch',
+        title: 'Tagebuch', // neutral: steht ggf. auf dem Sperrbildschirm
         body: texte[Math.min(i, 1)],
         schedule: { at, allowWhileIdle: true },
         extra: { ziel: 'heute' },

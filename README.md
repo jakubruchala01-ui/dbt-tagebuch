@@ -85,7 +85,19 @@ DBT-Tagebuch\
     js\db.js           Speicher (IndexedDB)
     js\model.js        Datenmodell, Versionierung
     js\defaults.js     Start-Vorlage und Standard-Skills
-    js\app.js          Oberfläche (Woche, Karte, Verlauf, PDF, Vorlage, Skills, Einstellungen)
+    js\app.js          Einstieg: Navigation, Kopfzeile, PIN-Sperre, Start
+    js\kern.js         gemeinsamer Zustand (state, E(), $main) und Ereignis-Verteiler
+    js\woche.js        Startseite, Lücken, Merken, Verlauf
+    js\karte.js        Tageskarte, Schnell-Karte
+    js\felder.js       Felder der Karte (Eingaben, Skalen-Wörter, Erklärungen)
+    js\eintrag.js      Karte automatisch speichern
+    js\draenge.js      Dränge & Verhalten, Skills
+    js\vorlage.js      Karte anpassen (Vorlage)
+    js\pdf.js          PDF-Seite und Druckvorschau
+    js\einstellungen.js  Mehr, Einstellungen & Daten, Sicherung, Datenschutz
+    js\erinnerung.js   Erinnerungen
+    js\notfall.js      Hilfe in der Krise, Kontakte, Notfallplan
+    js\hilfe.js        Einführung und ?-Hilfe
     js\ketten.js       Verhaltensketten
     js\sicherheit.js   PIN-Sperre
     js\ui.js           gemeinsame Helfer (Datum, Overlay, Meldungen)

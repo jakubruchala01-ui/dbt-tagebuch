@@ -118,7 +118,7 @@ Offen daraus: Texte der Datenschutzseite ergänzen (Druckdienst, Teilen, Tastatu
 - Test: echte Alt-Sicherung (Kopie) importieren → Verlauf und PDF vergleichen, vorher/nachher gleich.
 
 **Nach dem Umbau: Code-Prüfung auf Qualität („Slop“)**
-- app.js hat ~1.900 Zeilen in einer Datei → beim Umbau in Module teilen (Karte, Vorlage, Einstellungen, Notfall)
+- (erledigt 27.11.2026, Durchgang 4) app.js in Module geteilt: kern, woche, karte, felder, eintrag, draenge, vorlage, pdf, einstellungen, erinnerung, notfall, hilfe. Neue JS-Dateien immer in `SHELL` in `app/sw.js` eintragen.
 - Danach Prüfung: doppelter Code, tote Funktionen, unklare Namen, fehlende Fehlerbehandlung (z. B. mit /simplify und /code-review)
 
 **Vorlage aufräumen (Analyse: testberichte/7-Vorlage-Analyse.md)**

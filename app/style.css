@@ -702,3 +702,15 @@ button.merken { display: inline-flex; align-items: center; gap: 6px; border-radi
 .datenschutz h3 { margin: 16px 0 4px; font-size: 1rem; color: var(--akzent); }
 .datenschutz p, .datenschutz li { line-height: 1.55; }
 .datenschutz ul { padding-left: 20px; margin: 4px 0; }
+
+/* Hilfe immer erreichbar: ♥ in jedem Fenster, auf dem Sperrbildschirm, groß genug für zittrige Hände */
+button.herz { min-height: 44px; min-width: 56px; padding: 8px 14px; justify-content: center; }
+.modal-herz {
+  position: absolute; top: 4px; right: 52px; width: 44px; height: 44px; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: color-mix(in srgb, var(--warm) 12%, transparent); color: var(--warm);
+}
+.sperr-herz { position: fixed; top: 12px; right: 12px; }
+.sperr-herz span { display: inline !important; }
+body.gesperrt #modal { z-index: 90; }
+.modal-box h2 { padding-right: 92px; }
+.sperr-vergessen[hidden], .sperrbox .fehler[hidden] { display: none; }

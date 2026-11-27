@@ -129,15 +129,38 @@ function hoheWerte(values) {
   return state.config.fields.filter((f) => istBelastend(f) && hasValue(values?.[f.id]) && (values[f.id] - f.min) / (f.max - f.min) >= schwelle);
 }
 
+/** Suizidgedanken ab 4 von 5 (bzw. 70 % der Skala) */
+function suizidHoch(values) {
+  const f = state.config.fields.find((x) => x.id === 'f_suizid');
+  return !!f && hasValue(values?.f_suizid) && (values.f_suizid - f.min) / (f.max - f.min) >= 0.7;
+}
+const KRISEN_HTML = `
+  <div class="notfallnummern">
+    <a class="notruf" href="tel:112"><b>112</b><small>Notruf (Rettungsdienst)</small></a>
+    <a href="tel:08001110111"><b>0800 111 0 111</b><small>Telefonseelsorge – kostenlos, rund um die Uhr</small></a>
+  </div>`;
+function zeigeKrisenHinweis() {
+  openModal(`
+    <h2>Suizidgedanken sind gerade stark.</h2>
+    <p>Danke, dass du das ehrlich einträgst. Wenn du in Gefahr bist: <strong>Ruf jetzt an.</strong></p>
+    ${KRISEN_HTML}
+    <div class="actions dialog-knoepfe">
+      <button class="primary" data-notfall>${icon('herz', 16)} Mein Notfallplan &amp; Kontakte</button>
+      <button class="ghost" data-modal-zu>Weiter eintragen</button>
+    </div>`, { klasse: 'sanft' });
+}
+
 function rueckmeldung(values) {
   toast(zufall(ANERKENNUNG[ton()]));
   erinnerungenAktualisieren();
   const hoch = hoheWerte(values);
-  if (!hoch.length || E().sanfterHinweis === false) return;
+  const krise = suizidHoch(values);
+  if (!krise && (!hoch.length || E().sanfterHinweis === false)) return;
   setTimeout(() => {
     openModal(`
       <h2>Heute war viel los.</h2>
       <p>${hoch.map((f) => esc(feldTitel(f))).join(', ')} ${hoch.length > 1 ? 'waren' : 'war'} hoch. Das ist kein Fehler – nur ein Hinweis, gut für dich zu sorgen.</p>
+      ${krise ? `<p>Bei starken Suizidgedanken: <strong>Ruf an, wenn du in Gefahr bist.</strong></p>${KRISEN_HTML}` : ''}
       <p>Magst du jetzt einen Skill ausprobieren?</p>
       ${uebungenListe().replace('class="uebungen-liste"', 'class="uebungen-liste kompakt"')}
       <div class="actions dialog-knoepfe">
@@ -241,8 +264,11 @@ function zeigeMerken() {
   });
 }
 
+window.addEventListener('pagehide', () => { autoSpeichernJetzt(); ketten.speichernJetzt(); speichereNotfallplan(); });
 window.addEventListener('beforeunload', (e) => {
   if (autoTimer) autoSpeichernJetzt();
+  ketten.speichernJetzt();
+  speichereNotfallplan();
   if (state.view === 'vorlage' && state.draftFields && templateChanged(state.config, state.draftFields)) {
     e.preventDefault();
     e.returnValue = '';
@@ -732,7 +758,7 @@ function schritt(id, delta, direkt = null) {
   const v = state.entry.values[id];
   let neu;
   if (direkt !== null) neu = direkt === v ? +(v - f.step).toFixed(4) : direkt; // nochmal tippen = eins weniger
-  else if (!hasValue(v)) neu = delta > 0 ? f.min : null;
+  else if (!hasValue(v)) neu = f.min;
   else if (delta < 0 && v <= f.min) neu = null; // unter Minimum = wieder „Offen“
   else neu = Math.min(f.max, Math.max(f.min, +(v + delta * f.step).toFixed(4)));
   if (neu !== null && neu < f.min) neu = null;
@@ -741,7 +767,9 @@ function schritt(id, delta, direkt = null) {
 }
 
 function setValue(id, value) {
+  const vorher = suizidHoch(state.entry.values);
   state.entry.values[id] = value;
+  if (id === 'f_suizid' && !vorher && suizidHoch(state.entry.values)) setTimeout(zeigeKrisenHinweis, 300);
   autoSpeichern();
   updFortschritt();
 }
@@ -1159,7 +1187,7 @@ function zeigeNotfall() {
 }
 
 /** Telefonnummer für tel:-Links: nur Ziffern und führendes + */
-const telHref = (nr) => String(nr).trim().replace(/^00/, '+').replace(/(?!^\+)[^\d]/g, '');
+const telHref = (nr) => String(nr).trim().replace(/\(0\)/g, '').replace(/^00/, '+').replace(/(?!^\+)[^\d]/g, '');
 
 function kontakteHtml() {
   const k = E().notfallKontakte ?? [];
@@ -1580,8 +1608,7 @@ $main.addEventListener('click', async (e) => {
     return renderDaten();
   }
   if (act === 'notfall-speichern') {
-    E().notfallPlan = $main.querySelector('#notfallplan').value.trim();
-    await saveConfig();
+    await speichereNotfallplan();
     return toast('Notfallplan gespeichert');
   }
   if (act === 'hinweis-zeigen') return zeigeHinweis();
@@ -1616,8 +1643,20 @@ $main.addEventListener('toggle', (e) => {
   if (e.target.open) state.zu.delete(g); else state.zu.add(g);
 }, true);
 
+let planTimer = null;
+let planGeaendert = false;
+/** Speichert den Notfallplan (wird beim Tippen sofort übernommen und kurz danach gesichert) */
+async function speichereNotfallplan() {
+  clearTimeout(planTimer);
+  const feld = $main.querySelector('#notfallplan');
+  if (feld && state.config) { planGeaendert ||= (E().notfallPlan ?? '') !== feld.value.trim(); E().notfallPlan = feld.value.trim(); }
+  if (!planGeaendert) return;
+  planGeaendert = false;
+  await saveConfig();
+}
 $main.addEventListener('input', (e) => {
   const t = e.target;
+  if (t.id === 'notfallplan') { E().notfallPlan = t.value.trim(); planGeaendert = true; clearTimeout(planTimer); planTimer = setTimeout(speichereNotfallplan, 600); return; }
   // Verhaltens-Baukasten
   if (t.id === 'vb-name') { state.vb.name = t.value; return; }
   if (t.id === 'vb-einheit') { state.vb.einheit = t.value.trim(); return; }
@@ -1738,7 +1777,15 @@ $main.addEventListener('change', async (e) => {
     return updateSkillCount();
   }
   if (t.dataset.skillRating) {
-    state.entry.skills[t.dataset.skillRating].rating = t.value === '' ? null : Number(t.value);
+    const id = t.dataset.skillRating;
+    const s = (state.entry.skills[id] ??= { used: false, rating: null });
+    s.rating = t.value === '' ? null : Number(t.value);
+    if (s.rating !== null && !s.used) {
+      s.used = true;
+      const cb = $main.querySelector(`[data-skill="${id}"]`);
+      if (cb) cb.checked = true;
+      updateSkillCount();
+    }
     autoSpeichern();
     return;
   }
@@ -1824,13 +1871,13 @@ $main.addEventListener('submit', async (e) => {
 // ---------- Sperre ----------
 async function entsperren() {
   if (!E().pin) return;
-  await sperren(E().pin, async () => { E().pin = null; await saveConfig(); toast('PIN entfernt'); });
+  await sperren(E().pin, async () => { E().pin = null; await saveConfig(); toast('PIN entfernt'); }, () => zeigeNotfall());
 }
 
 let verstecktSeit = null;
 document.addEventListener('visibilitychange', async () => {
   if (document.hidden) { verstecktSeit = Date.now(); return; }
-  if (E()?.pin && verstecktSeit && Date.now() - verstecktSeit > 60_000 && document.getElementById('sperre').hidden) await entsperren();
+  if (state.config?.einstellungen?.pin && verstecktSeit && Date.now() - verstecktSeit > 60_000 && document.getElementById('sperre').hidden) await entsperren();
   verstecktSeit = null;
 });
 

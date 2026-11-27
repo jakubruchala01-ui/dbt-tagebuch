@@ -24,7 +24,7 @@ export const UEBUNGEN = [
   {
     id: 'tipp', farbe: 'kat-ereignisse', name: 'TIPP bei hoher Anspannung', kurz: 'Kälte, Bewegung, Atmung, Entspannung', skill: 's_tipp',
     schritte: [
-      '<b>T – Temperatur:</b> Kaltes Wasser ins Gesicht oder einen Kühlakku auf Augen und Wangen, etwa 30 Sekunden. Halte dabei kurz die Luft an.',
+      '<b>Vorsicht:</b> Bei Herzproblemen, niedrigem Puls, Betablockern oder Essstörung Kälte und starke Bewegung vorher mit Ärztin oder Arzt absprechen.<br><br><b>T – Temperatur:</b> Kaltes Wasser ins Gesicht oder einen Kühlakku auf Augen und Wangen, etwa 30 Sekunden. Halte dabei kurz die Luft an.',
       '<b>I – Intensive Bewegung:</b> Ein paar Minuten zügig gehen, Treppen steigen, Hampelmänner – so, dass du außer Atem kommst.',
       '<b>P – Paced Breathing:</b> Langsam atmen, länger aus als ein (z. B. 4 Sekunden ein, 6 Sekunden aus).',
       '<b>P – Progressive Muskelentspannung:</b> Hände zu Fäusten ballen, 5 Sekunden halten, loslassen. Dann Schultern hochziehen, halten, fallen lassen.',

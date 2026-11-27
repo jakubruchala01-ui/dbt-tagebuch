@@ -24,12 +24,13 @@ export const pinGueltig = (pin) => /^\d{4,8}$/.test(pin);
  * Zeigt den Sperrbildschirm. Löst auf, sobald die richtige PIN eingegeben wurde.
  * onEntfernen: wird aufgerufen, wenn die PIN über „vergessen“ entfernt wird.
  */
-export function sperren(gespeichert, onEntfernen) {
+export function sperren(gespeichert, onEntfernen, onNotfall) {
   const el = document.getElementById('sperre');
   el.hidden = false;
   document.body.classList.add('gesperrt');
   el.innerHTML = `
     <form class="sperrbox" autocomplete="off">
+      <button type="button" class="herz sperr-herz" id="sperr-notfall">${icon('herz', 18)}<span>Hilfe in der Krise</span></button>
       <div class="sperr-icon" aria-hidden="true">${icon('schloss', 40)}</div>
       <h2>DBT-Tagebuch</h2>
       <p>PIN eingeben</p>
@@ -58,6 +59,7 @@ export function sperren(gespeichert, onEntfernen) {
         input.focus();
       }
     };
+    el.querySelector('#sperr-notfall').onclick = () => onNotfall?.();
     el.querySelector('#pin-vergessen').onclick = () => {
       el.querySelector('#vergessen-box').hidden = false;
       el.querySelector('#vergessen-eingabe').focus();

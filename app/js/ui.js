@@ -35,12 +35,13 @@ let beimSchliessen = null;
 export function openModal(html, { klasse = '', schliessbar = true, onClose = null } = {}) {
   const m = document.getElementById('modal');
   m.innerHTML = `<div class="modal-box ${klasse}" role="dialog" aria-modal="true">
-    ${schliessbar ? `<button class="modal-zu" data-modal-zu aria-label="Schließen">${icon('x', 20)}</button>` : ''}${html}</div>`;
+    ${klasse.includes('notfall') ? '' : `<button class="modal-herz" data-notfall aria-label="Hilfe in der Krise">${icon('herz', 18)}</button>`}${schliessbar ? `<button class="modal-zu" data-modal-zu aria-label="Schließen">${icon('x', 20)}</button>` : ''}${html}</div>`;
   m.hidden = false;
   beimSchliessen = onClose;
   document.body.classList.add('modal-offen');
   if (schliessbar) {
-    m.onclick = (e) => { if (e.target === m || e.target.closest('[data-modal-zu]')) closeModal(); };
+    const aussenZu = !klasse.includes('uebung-box');
+    m.onclick = (e) => { if ((aussenZu && e.target === m) || e.target.closest('[data-modal-zu]')) closeModal(); };
     m.onkeydown = (e) => { if (e.key === 'Escape') closeModal(); };
   } else { m.onclick = null; m.onkeydown = null; }
   setTimeout(() => m.querySelector('[autofocus], .primary, button')?.focus(), 30);

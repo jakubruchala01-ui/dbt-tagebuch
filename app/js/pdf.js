@@ -60,11 +60,23 @@ export async function pdfVorschau() {
     <div class="blaetter">${berichtHTML({ config: state.config, entries, ketten: alleKetten.filter((k) => !k.archiviert), ...p, name, luecken: state.config.luecken ?? {}, stundenNotizen: (state.config.stundenNotizen ?? []).filter((n) => !n.erledigt), klaeren: state.config.fields.filter((f) => !f.hidden && state.config.feldInfo?.[f.id]?.klaeren).map((f) => ({ name: f.name, notiz: state.config.feldInfo[f.id].notiz })) })}</div>`;
   druck.hidden = false;
   document.body.classList.add('druckmodus');
+  vorschauEinpassen();
 }
+
+/** Blatt (A4 quer) auf die Bildschirmbreite verkleinern, statt die Tabelle zu stauchen */
+function vorschauEinpassen() {
+  const b = document.querySelector('#druck .blaetter');
+  const blatt = b?.querySelector('.blatt');
+  if (!blatt) return;
+  b.style.removeProperty('--vorschau');
+  const platz = b.clientWidth - 32; // Innenabstand links/rechts
+  b.style.setProperty('--vorschau', Math.min(1, platz / blatt.offsetWidth).toFixed(3));
+}
+window.addEventListener('resize', () => { if (!document.getElementById('druck').hidden) vorschauEinpassen(); });
 
 async function berichtAlsDatei() {
   const css = await fetch('bericht.css').then((r) => r.text()).catch(() => '');
-  const blaetter = document.querySelector('#druck .blaetter')?.outerHTML ?? '';
+  const blaetter = (document.querySelector('#druck .blaetter')?.outerHTML ?? '').replace(/ style="[^"]*"/, '');
   const html = `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Diary-Card ${state.pdf.von} bis ${state.pdf.bis}</title><style>${css}</style></head><body><div id="druck">${blaetter}</div></body></html>`;
   await dateiSpeichern(`diary-card-${state.pdf.von}-bis-${state.pdf.bis}.html`, html, 'text/html');

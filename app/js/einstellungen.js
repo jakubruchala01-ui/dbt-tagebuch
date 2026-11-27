@@ -153,11 +153,11 @@ export async function renderDaten() {
     </div>
     <div class="karte">
       <h2>Wo liegen meine Daten?</h2>
-      <p>Nur hier im Browser auf diesem Gerät (IndexedDB, Adresse <code>${esc(location.origin)}</code>). Nichts wird ins Internet gesendet.</p>
+      <p>${istNativ() ? 'Nur hier in dieser App auf deinem Handy.' : `Nur hier im Browser auf diesem Gerät (IndexedDB, Adresse <code>${esc(location.origin)}</code>).`} Nichts wird ins Internet gesendet.</p>
       <p>${entries.length} Tageskarten · ${alleKetten.length} Verhaltensketten · ${state.config.skills.length} Skills · Vorlage v${currentVersion(state.config).v}</p>
-      <p>Dauerhafter Speicher: <strong>${persist ? 'ja' : 'nein'}</strong>
+      ${istNativ() ? '' : `<p>Dauerhafter Speicher: <strong>${persist ? 'ja' : 'nein'}</strong>
         ${persist ? '' : '<button data-act="persist" class="ghost">anfordern</button>'}
-        <br><span class="meta">Verhindert, dass der Browser die Daten bei Platzmangel selbst löscht.</span></p>
+        <br><span class="meta">Verhindert, dass der Browser die Daten bei Platzmangel selbst löscht.</span></p>`}
     </div>
     <div class="karte">
       <h2>Sicherung</h2>
@@ -166,7 +166,7 @@ export async function renderDaten() {
       <p class="meta">Die Datei ist nicht verschlüsselt. Nicht per Messenger, Mail oder Cloud verschicken – am besten auf einem USB-Stick oder dem PC aufbewahren.</p>
       <div class="actions"><button data-act="export" class="primary">Exportieren</button></div>
       <h2>Import</h2>
-      <p>Ersetzt alle Daten hier durch die Datei. Vorher wird automatisch ein Export der aktuellen Daten heruntergeladen.</p>
+      <p>Ersetzt alle Daten hier durch die Datei. ${istNativ() ? 'Vorher öffnet sich das Teilen-Menü, um die aktuellen Daten zu sichern.' : 'Vorher wird automatisch ein Export der aktuellen Daten heruntergeladen.'}</p>
       <input type="file" id="importfile" accept="application/json,.json">
     </div>`;
 }

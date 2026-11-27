@@ -43,7 +43,7 @@ body.druckmodus { overflow: hidden; }
 .blaetter { padding: 24px 16px 48px; }
 
 #druck .blatt {
-  width: 297mm; max-width: 100%;
+  width: 297mm;
   min-height: 210mm;
   margin: 0 auto 24px;
   padding: 11mm 12mm 10mm;
@@ -161,6 +161,9 @@ body.druckmodus { overflow: hidden; }
 #druck .stunde-liste { margin: 0; padding-left: 6mm; font-size: 10pt; line-height: 1.45; }
 #druck .stunde-liste li { margin-bottom: 2.5mm; padding-bottom: 2mm; border-bottom: 1px dotted var(--line); }
 #druck .stunde-liste small { color: var(--mute); font-size: 7.5pt; }
+
+/* Vorschau am Bildschirm: Blatt in A4-Breite, auf schmalen Bildschirmen verkleinert (--vorschau setzt pdf.js) */
+@media screen { #druck .blaetter { zoom: var(--vorschau, 1); } }
 
 /* Druck */
 @media print {

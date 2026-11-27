@@ -7,6 +7,7 @@ import { uebungenListe } from './uebungen.js';
 import { $main, E, state, saveConfig, ton, nav, aufKlick } from './kern.js';
 import { pdfVorschau } from './pdf.js';
 import { exportieren } from './einstellungen.js';
+import { istNativ } from './plattform.js';
 
 const LUECKEN_GRUENDE = ['keine Kraft', 'vergessen', 'bewusst Pause', 'schlechte Phase', 'keine Zeit', 'anderes'];
 
@@ -207,7 +208,7 @@ export async function renderWoche() {
       <div class="sicherung-hinweis">
         <span>${icon('wolke', 20)}</span>
         <div><b>Zeit für eine Sicherung?</b>
-          <small>${E().letzteSicherung ? `Letzte Sicherung: ${datumKurz(E().letzteSicherung)}` : 'Noch keine Sicherung'} · Deine Einträge liegen nur in diesem Browser.</small></div>
+          <small>${E().letzteSicherung ? `Letzte Sicherung: ${datumKurz(E().letzteSicherung)}` : 'Noch keine Sicherung'} · Deine Einträge liegen nur ${istNativ() ? 'in dieser App' : 'in diesem Browser'}.</small></div>
         <span class="sicherung-knoepfe"><button class="ghost klein" data-act="w-sichern-spaeter">Später</button><button class="primary" data-act="w-sichern">Jetzt sichern</button></span>
       </div>` : ''}
     ${istAktuell ? `

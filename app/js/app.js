@@ -86,6 +86,7 @@ document.querySelectorAll('nav button[data-icon]').forEach((b) => b.insertAdjace
 document.getElementById('notfall-btn').innerHTML = `${icon('herz', 16)}<span>Hilfe</span>`;
 document.getElementById('merken-btn').innerHTML = `${icon('merken', 16)}<span>Merken</span>`;
 document.getElementById('merken-btn').addEventListener('click', () => zeigeMerken());
+document.getElementById('hilfe-btn').addEventListener('click', () => zeigeHilfe());
 
 // Übungen und Schnell-Karte können aus der Seite und aus Fenstern gestartet werden
 document.addEventListener('click', (e) => {
@@ -536,12 +537,13 @@ async function renderHeute() {
         if (state.drangOffen?.datum !== state.date) {
           state.drangOffen = { datum: state.date, set: new Set(dg.filter(([, fs]) => gruppeHatWerte(fs)).map(([g]) => g)) };
         }
+        // Kasten direkt nach „Befinden“ (sonst an der Stelle des ersten Drangs)
+        const nachBefinden = gruppen.some(([g]) => g === 'Befinden');
         let kastenFertig = false;
+        const kasten = () => { if (kastenFertig || !dg.length) return ''; kastenFertig = true; return draengeKasten(dg); };
         return gruppen.map(([g, fs]) => {
-          if (!istDrang(g)) return gruppeHtml(g, fs);
-          if (kastenFertig || !dg.length) return '';
-          kastenFertig = true;
-          return draengeKasten(dg);
+          if (istDrang(g)) return nachBefinden ? '' : kasten();
+          return gruppeHtml(g, fs) + (g === 'Befinden' ? kasten() : '');
         }).join('');
       })()}
       <details class="kasten gruppe-k" data-gruppe="__skills" ${state.zu?.has('__skills') || kurz ? '' : 'open'}>
@@ -983,7 +985,7 @@ const istVerhaltenGruppe = (g = '') => /^(Verhalten|Problemverhalten|Neue Wege):
 
 function verhaltenBaukasten() {
   const vb = (state.vb ??= { vorlage: 'bildschirm', arten: new Set(VERHALTEN_VORLAGEN.bildschirm.arten), name: '', einheit: '' });
-  return `<details class="karte baukasten kat-problem" ${vb.name ? 'open' : ''}>
+  return `<details class="karte baukasten kat-problem" ${vb.name || state.vbOffen ? 'open' : ''}>
     <summary><b>${icon('plus', 18)} Neuen Drang oder neues Verhalten hinzufügen</b></summary>
     <p class="meta">Für Süchte, alte Gewohnheiten, Hobbys oder neue Wege: Wähle, <b>was</b> du daran beobachten möchtest. Später jederzeit änderbar.</p>
     <label class="field"><span class="fname">Name</span>
@@ -1038,6 +1040,12 @@ function zeigeMessartWahl(gruppe) {
     einfuegen(neu);
     toast(`${neu.length} Messart${neu.length > 1 ? 'en' : ''} ergänzt – jetzt „Speichern“`);
   };
+}
+
+/** Fertige Zusammenstellung: blendet nur ein/aus, löscht nie etwas */
+function presetFelder(art, felder) {
+  if (art === 'standard') return applyStandard(felder);
+  return felder.map((f) => ({ ...f, hidden: art === 'alles' ? false : !BEFINDEN_IDS.includes(f.id) && !['text', 'meds'].includes(f.type) && kategorie(f.group ?? '') !== 'problem' }));
 }
 
 // ---------- Vorlage ----------
@@ -1233,6 +1241,7 @@ async function pdfVorschau() {
   druck.innerHTML = `
     <div class="druckleiste">
       <span>Vorschau · ${datumKurz(p.von)} – ${datumKurz(p.bis)}</span>
+      <small class="druckhinweis">Nicht per Messenger, Mail oder Cloud verschicken – in der Stunde zeigen oder ausdrucken.</small>
       <button data-act="pdf-drucken" class="primary">${kannDrucken() ? 'Drucken / Als PDF speichern' : 'Bericht teilen'}</button>
       <button data-act="pdf-schliessen">Schließen</button>
     </div>
@@ -1354,22 +1363,98 @@ async function erinnerungenAktualisieren() {
   try { return await erinnerungenPlanen(ER(), ton(), erledigt); } catch { return null; }
 }
 
+/** Einführung beim ersten Start (4 Schritte, überspringbar). Sicherheit zuerst. */
 function zeigeHinweis() {
+  // Wahl der Ausführlichkeit nur beim allerersten Start – später nie ungefragt die Karte umbauen
+  const ersterStart = !E().hinweisGesehen;
+  const schritte = [
+    () => `<h2>Willkommen</h2>
+      <p>Dieses Tagebuch hilft dir, dich selbst zu beobachten und deine Therapie vorzubereiten. Es stellt keine Diagnose und ersetzt keine Therapie.</p>
+      <p><strong>In einer Krise</strong> oder wenn du daran denkst, dir etwas anzutun: Notruf <strong>112</strong> oder Telefonseelsorge <strong>0800 111 0 111</strong>
+      (kostenlos, rund um die Uhr). Hilfe findest du jederzeit über das <strong>♥</strong> oben rechts.</p>`,
+    () => `<h2>Deine Daten gehören dir</h2>
+      <p><strong>Deine Einträge bleiben nur auf diesem Gerät.</strong> Niemand sonst kann sie sehen – auch nicht die Entwickler, die Klinik oder eine andere Stelle.
+      Es gibt keine Kopie im Internet.</p>
+      <p>Das heißt aber auch: Geht das Gerät verloren oder wird die App gelöscht, sind die Einträge weg.
+      <strong>Sichere sie deshalb regelmäßig:</strong> Mehr → Einstellungen &amp; Daten → Sicherung.</p>`,
+    () => `<h2>Wie ausführlich möchtest du deine Karte?</h2>
+      <p class="meta">Tippe eine Möglichkeit an – danach geht es weiter. Später jederzeit änderbar (Mehr → Karte anpassen), es wird nichts gelöscht.</p>
+      <div class="vorlage-presets tour-wahl">
+        <button type="button" data-tour-preset="einfach"><b>Einfach</b><small>Befinden, Dränge, Medikamente, Notizen, Skills</small></button>
+        <button type="button" data-tour-preset="standard"><b>Standard</b><small>wie die Papier-Diary-Card</small></button>
+        <button type="button" data-tour-preset="alles"><b>Ausführlich</b><small>alles zeigen</small></button>
+      </div>`,
+  ].filter((_, k) => k !== 2 || ersterStart).concat([
+    () => `<h2>So findest du dich zurecht</h2>
+      <ul class="tour-liste">
+        <li><b>Woche</b> – dein Überblick. Die <b>Schnell-Karte</b> dauert etwa 30 Sekunden.</li>
+        <li><b>Karte</b> – der ganze Tag, wenn du mehr Zeit hast. Alles speichert sich von selbst.</li>
+        <li><b>?</b> oben – erklärt die Seite, auf der du gerade bist.</li>
+        <li><b>♥</b> oben – Hilfe in der Krise, immer erreichbar.</li>
+      </ul>`,
+  ]);
+  let i = 0;
   return new Promise((resolve) => {
-    const box = openModal(`
-      <h2>Bevor du beginnst</h2>
-      <p>Dieses Tagebuch ist ein Werkzeug zur Selbstbeobachtung. Es bietet keine Diagnose oder Behandlung und ersetzt nicht die Begleitung durch deine Therapeutin oder deinen Therapeuten.</p>
-      <p>Wenn du in einer Krise bist oder daran denkst, dir etwas anzutun: Wende dich sofort an die <strong>Telefonseelsorge (0800 111 0 111)</strong> oder den <strong>Notruf 112</strong>.
-      Hilfe findest du jederzeit über das <strong>♥</strong> oben rechts.</p>
-      <p class="meta">Deine Einträge bleiben nur auf diesem Gerät. Nichts wird ins Internet gesendet.</p>
-      <div class="actions"><button class="primary" id="hinweis-ok">Verstanden</button></div>`, { schliessbar: false });
-    box.querySelector('#hinweis-ok').onclick = async () => {
+    const fertig = async () => {
       E().hinweisGesehen = true;
       await saveConfig();
       closeModal();
       resolve();
     };
+    const zeigen = () => {
+      const letzter = i === schritte.length - 1;
+      const box = openModal(`${schritte[i]()}
+        <div class="tour-punkte" aria-hidden="true">${schritte.map((_, k) => `<span class="${k === i ? 'an' : ''}"></span>`).join('')}</div>
+        <div class="actions dialog-knoepfe">
+          ${letzter ? '' : '<button class="ghost" id="tour-skip">Überspringen</button>'}
+          ${i > 0 ? '<button class="ghost" id="tour-zurueck">Zurück</button>' : ''}
+          <button class="primary" id="tour-weiter">${letzter ? 'Los geht’s' : 'Weiter'}</button>
+        </div>`, { schliessbar: false, klasse: 'tour' });
+      box.querySelector('#tour-skip')?.addEventListener('click', fertig);
+      box.querySelector('#tour-zurueck')?.addEventListener('click', () => { i -= 1; zeigen(); });
+      box.querySelector('#tour-weiter').addEventListener('click', () => { if (letzter) fertig(); else { i += 1; zeigen(); } });
+      let gewaehlt = false;
+      box.querySelectorAll('[data-tour-preset]').forEach((b) => b.addEventListener('click', async () => {
+        if (gewaehlt) return; // Doppelklick
+        gewaehlt = true;
+        const neu = presetFelder(b.dataset.tourPreset, state.config.fields);
+        if (commitTemplate(state.config, neu)) await saveConfig();
+        toast(`„${b.querySelector('b').textContent}“ gewählt`);
+        i = Math.min(i + 1, schritte.length - 1);
+        zeigen();
+      }));
+    };
+    zeigen();
   });
+}
+
+// ---------- ?-Hilfe je Seite ----------
+const HILFE = {
+  woche: ['Deine Woche', 'Hier siehst du auf einen Blick, an welchen Tagen du eine Karte ausgefüllt hast. Tippe auf einen Tag, um ihn zu öffnen oder nachzutragen.',
+    'Die Kacheln zeigen, wie es dir im Schnitt ging. Lücken sind okay – du kannst jederzeit weitermachen.'],
+  heute: ['Deine Tageskarte', 'Fülle aus, was heute wichtig war. Nichts ist Pflicht – „Offen“ heißt einfach: noch kein Wert.',
+    'Die Zahlen 0–5 bedeuten von „gar nicht“ bis „sehr stark“; bei Drängen und Skills steht ein Wort dabei. Mit − und + oder dem Balken stellst du den Wert ein.',
+    'Bei „Dränge & Verhalten“ tippst du nur an, was heute da war. Bei Skills tippst du die genutzten an und wählst darunter, wie gut sie geholfen haben.',
+    'Alles speichert sich von selbst. Wenig Zeit? Die Schnell-Karte auf der Startseite dauert etwa 30 Sekunden.'],
+  ketten: ['Verhaltensketten', 'Eine Kette hilft zu verstehen, wie es zu einem Problemverhalten kam: Auslöser, Gedanken, Gefühle, Handlung, Folgen.',
+    'Du musst nicht alles auf einmal ausfüllen. Besprich die Kette am besten in deiner nächsten Stunde.'],
+  verlauf: ['Verlauf', 'Alle Karten als Tabelle. So siehst du, wie sich Werte über Wochen verändern. Ändern kannst du hier nichts – dafür den Tag in der Karte öffnen.'],
+  pdf: ['Bericht', 'Erstellt eine übersichtliche Diary Card für deine Therapiestunde. Wähle den Zeitraum und was hinein soll.',
+    'Zeige den Bericht in der Stunde oder drucke ihn aus. Bitte nicht per Messenger, Mail oder Cloud verschicken – er enthält Gesundheitsdaten.'],
+  mehr: ['Mehr', 'Hier findest du alles Weitere: Verlauf, Karte anpassen, Skills, Einstellungen und Datenschutz.'],
+  vorlage: ['Karte anpassen', 'Hier legst du fest, was auf deiner Tageskarte steht. Am einfachsten: oben eine fertige Zusammenstellung wählen.',
+    'Anpassen lohnt sich, wenn du etwas Bestimmtes beobachten willst – z. B. einen neuen Drang, den deine Therapeutin mit dir anschauen möchte.',
+    'Nichts geht verloren: Ausgeblendetes verschwindet nur von der Karte, alte Einträge bleiben vollständig. Änderungen gelten nach „Speichern“.'],
+  skills: ['Skills', 'Deine Liste der DBT-Skills. Ausgeblendete Skills erscheinen nicht mehr auf der Karte. Mit „Notfall“ markierte stehen im ♥-Fenster.'],
+  daten: ['Einstellungen & Daten', 'Aussehen, Erinnerung, PIN, Notfallkontakte und deine Sicherung.',
+    'Wichtig: Deine Einträge gibt es nur auf diesem Gerät. Exportiere regelmäßig eine Sicherung, sonst sind sie bei Verlust des Handys weg.'],
+  datenschutz: ['Datenschutz', 'Hier steht ehrlich, was die App speichert, wo es liegt und was sie nicht tut.'],
+};
+function zeigeHilfe() {
+  const [titel, ...absaetze] = HILFE[state.view] ?? HILFE.woche;
+  openModal(`<h2>${esc(titel)}</h2>${absaetze.map((a) => `<p>${esc(a)}</p>`).join('')}
+    <p class="meta">In einer Krise: ♥ oben rechts. Einführung wiederholen: Mehr → Einstellungen &amp; Daten.</p>
+    <div class="actions"><button class="primary" data-modal-zu>Okay</button></div>`, { klasse: 'hilfe' });
 }
 
 // ---------- Einstellungen & Daten ----------
@@ -1447,7 +1532,7 @@ async function renderDaten() {
       <p class="meta">Erscheint im ♥-Fenster. z. B. was mir in Krisen hilft, Warnzeichen, meine Gründe weiterzumachen.</p>
       <textarea id="notfallplan" rows="5" placeholder="z. B. Anna anrufen: 0151 …&#10;Igelball, kaltes Wasser, raus an die Luft">${esc(E().notfallPlan)}</textarea>
       <div class="actions"><button data-act="notfall-speichern" class="primary">Speichern</button>
-        <button class="ghost" data-act="hinweis-zeigen">Start-Hinweis erneut zeigen</button></div>
+        <button class="ghost" data-act="hinweis-zeigen">Einführung erneut zeigen</button></div>
     </div>
     <div class="karte">
       <h2>Wo liegen meine Daten?</h2>
@@ -1461,6 +1546,7 @@ async function renderDaten() {
       <h2>Sicherung</h2>
       <p>Export erzeugt eine JSON-Datei mit allem. <strong>Nicht verschlüsselt</strong> – sicher aufbewahren, am besten an einem zweiten Ort (z. B. USB-Stick).</p>
       <p class="meta">Letzte Sicherung: <strong>${E().letzteSicherung ? datumKurz(E().letzteSicherung) : 'noch keine'}</strong>. Die Startseite erinnert sanft, wenn die letzte Sicherung über 30 Tage her ist.</p>
+      <p class="meta">Die Datei ist nicht verschlüsselt. Nicht per Messenger, Mail oder Cloud verschicken – am besten auf einem USB-Stick oder dem PC aufbewahren.</p>
       <div class="actions"><button data-act="export" class="primary">Exportieren</button></div>
       <h2>Import</h2>
       <p>Ersetzt alle Daten hier durch die Datei. Vorher wird automatisch ein Export der aktuellen Daten heruntergeladen.</p>
@@ -1674,6 +1760,7 @@ $main.addEventListener('click', async (e) => {
     }
     const felder = eindeutig(verhaltenFelder(name, newId('f'), [...vb.arten], { vorlage: vb.vorlage, einheit: vb.einheit }));
     state.vb = { ...vb, name: '', einheit: '' };
+    state.vbOffen = true;
     einfuegen(felder);
     return toast(`„${name}“ mit ${felder.length} Messarten angelegt – jetzt „Speichern“`);
   }
@@ -1685,8 +1772,7 @@ $main.addEventListener('click', async (e) => {
   }
   if (act === 'tpl-preset') {
     const art = el.dataset.wert;
-    const neu = art === 'standard' ? applyStandard(state.draftFields)
-      : state.draftFields.map((f) => ({ ...f, hidden: art === 'alles' ? false : !BEFINDEN_IDS.includes(f.id) && !['text', 'meds'].includes(f.type) && kategorie(f.group ?? '') !== 'problem' }));
+    const neu = presetFelder(art, state.draftFields);
     const vorher = new Set(state.draftFields.filter((f) => !f.hidden).map((f) => f.id));
     const sichtbar = neu.filter((f) => !f.hidden);
     const aus = state.draftFields.filter((f) => vorher.has(f.id) && neu.find((n) => n.id === f.id)?.hidden).length;

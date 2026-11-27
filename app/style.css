@@ -755,3 +755,28 @@ details.baukasten > summary { cursor: pointer; min-height: 44px; display: flex; 
 .feld .row { flex-wrap: wrap; }
 .feld input.name { min-width: 0; flex: 1 1 140px; }
 .bereichkopf { flex-wrap: wrap; gap: 6px; } .bereichkopf .bereichname { flex: 1 1 160px; min-width: 0; }
+
+/* ===== D3: runde, ruhige Optik ===== */
+:root { --radius: 18px; --schatten: 0 1px 2px rgba(0, 0, 0, .04), 0 6px 18px rgba(0, 0, 0, .06); }
+body { font-family: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+.karte, .kasten, .kachel, details.bereich, .tablewrap {
+  border-radius: var(--radius);
+  border-color: color-mix(in srgb, var(--linie) 55%, transparent);
+  box-shadow: var(--schatten);
+}
+button { border-radius: 999px; }
+input, select, textarea { border-radius: 12px; }
+.modal-box { border-radius: 22px; }
+
+.karte, .kasten { margin-bottom: 14px; }
+/* ?-Knopf, Tour, Hinweise */
+.hilfe-knopf { width: 44px; height: 44px; padding: 0; display: inline-grid; place-items: center; font-weight: 700; font-size: 1.1rem; color: var(--akzent); }
+.druckhinweis { flex: 1 1 100%; order: 9; font-size: .8rem; opacity: .85; }
+.tour-punkte { display: flex; justify-content: center; gap: 8px; margin: 16px 0 4px; }
+.tour-punkte span { width: 8px; height: 8px; border-radius: 50%; background: var(--linie); }
+.tour-punkte span.an { background: var(--akzent); width: 22px; border-radius: 999px; }
+.tour-liste { padding-left: 18px; line-height: 1.7; }
+.tour-wahl { margin-top: 10px; }
+/* ♥ und ✕ im Fenster deutlich getrennt (Verwechslungsgefahr) */
+.modal-herz { right: auto; left: 12px; top: 10px; }
+.modal-box:has(.modal-herz) > h2:first-of-type { padding-left: 52px; }
